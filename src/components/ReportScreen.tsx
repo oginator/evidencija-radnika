@@ -1,0 +1,355 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  isoDate,
+  isLastDayOfMonth,
+  lastDayOfMonthNum,
+  MONTH_NAMES,
+  shiftDate,
+  todayISO,
+  type PeriodKey,
+} from "@/lib/period";
+import {
+  formatHours,
+  formatPercent,
+  formatPoints,
+  formatRsd,
+} from "@/lib/format";
+
+type AssemblyDetail = { name: string; quantity: number; points: number };
+
+type Row = {
+  workerId: string;
+  workerName: string;
+  active: boolean;
+  hours: number;
+  monthHours: number;
+  expectedHours: number;
+  hoursPercent: number;
+};
+
+type Collective = {
+  assemblies: AssemblyDetail[];
+  furnitureQuantity: number;
+  furniturePoints: number;
+  stimulationRsd: number;
+};
+
+type Report = {
+  year: number;
+  month: number;
+  period: PeriodKey;
+  date: string;
+  label: string;
+  lastDay: number;
+  rsdPerPoint: number;
+  workdayHours: number;
+  expectedHours: number;
+  weekdayCount: number;
+  daysWithData: string[];
+  rows: Row[];
+  collective: Collective;
+};
+
+export function ReportScreen({ owner: _owner }: { owner: boolean }) {
+  const searchParams = useSearchParams();
+  const today = todayISO();
+  const [period, setPeriod] = useState<PeriodKey>(
+    (searchParams.get("period") as PeriodKey) || "day",
+  );
+  const [date, setDate] = useState(searchParams.get("date") || today);
+  const [year, setYear] = useState(
+    Number(searchParams.get("year") || date.slice(0, 4)),
+  );
+  const [month, setMonth] = useState(
+    Number(searchParams.get("month") || date.slice(5, 7)),
+  );
+  const [report, setReport] = useState<Report | null>(null);
+  const [error, setError] = useState("");
+  const [showFurniture, setShowFurniture] = useState(false);
+
+  useEffect(() => {
+    if (period !== "day") return;
+    const nextYear = Number(date.slice(0, 4));
+    const nextMonth = Number(date.slice(5, 7));
+    if (nextYear !== year) setYear(nextYear);
+    if (nextMonth !== month) setMonth(nextMonth);
+  }, [date, period, year, month]);
+
+  useEffect(() => {
+    if (period !== "day") return;
+    const last = lastDayOfMonthNum(year, month);
+    const day = Number(date.slice(8));
+    const inMonth = date.slice(0, 7) === `${year}-${String(month).padStart(2, "0")}`;
+    if (!inMonth) {
+      setDate(isoDate(year, month, Math.min(day || 1, last)));
+    }
+  }, [year, month, period, date]);
+
+  useEffect(() => {
+    const params = new URLSearchParams({
+      year: String(year),
+      month: String(month),
+      period,
+    });
+    if (period === "day") params.set("date", date);
+    fetch(`/api/reports?${params}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Greška");
+        setReport(data);
+        setShowFurniture(false);
+        setError("");
+      })
+      .catch((err: Error) => setError(err.message));
+  }, [year, month, period, date]);
+
+  const sums = report?.rows.reduce(
+    (acc, row) => ({
+      hours: acc.hours + row.hours,
+      monthHours: acc.monthHours + row.monthHours,
+    }),
+    { hours: 0, monthHours: 0 },
+  );
+
+  const lastDay = lastDayOfMonthNum(year, month);
+  const selectedDay = Number(date.slice(8));
+  const daysWithData = new Set(report?.daysWithData ?? []);
+  const percentLabel = period === "day" ? "% smene" : "% norme";
+  const monthEndHighlight =
+    period === "second" ||
+    period === "month" ||
+    (period === "day" && isLastDayOfMonth(date));
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">Izveštaj</h1>
+        <p className="text-sm text-muted">
+          Dnevni pregled, 1–15., 16.–kraj ili ceo mesec.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <select
+          value={month}
+          onChange={(e) => setMonth(Number(e.target.value))}
+          className="rounded-xl border border-line bg-card px-3 py-2"
+        >
+          {MONTH_NAMES.map((name, index) => (
+            <option key={name} value={index + 1}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+          className="rounded-xl border border-line bg-card px-3 py-2"
+        >
+          {[year - 1, year, year + 1]
+            .filter((value, index, all) => all.indexOf(value) === index)
+            .map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setPeriod("day")}
+          className={`rounded-xl px-3 py-2 text-sm ${
+            period === "day" ? "bg-brand text-white" : "border border-line bg-card"
+          }`}
+        >
+          Dan
+        </button>
+        <button
+          type="button"
+          onClick={() => setPeriod("first")}
+          className={`rounded-xl px-3 py-2 text-sm ${
+            period === "first" ? "bg-brand text-white" : "border border-line bg-card"
+          }`}
+        >
+          1–15.
+        </button>
+        <button
+          type="button"
+          onClick={() => setPeriod("second")}
+          className={`rounded-xl px-3 py-2 text-sm ${
+            period === "second" ? "bg-brand text-white" : "border border-line bg-card"
+          }`}
+        >
+          16–kraj
+        </button>
+        <button
+          type="button"
+          onClick={() => setPeriod("month")}
+          className={`rounded-xl px-3 py-2 text-sm ${
+            period === "month" ? "bg-brand text-white" : "border border-line bg-card"
+          }`}
+        >
+          Ceo mesec
+        </button>
+      </div>
+
+      {period === "day" ? (
+        <div className="space-y-3 rounded-2xl border border-line bg-card p-3">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setDate(shiftDate(date, -1))}
+              className="rounded-xl px-3 py-2 text-lg hover:bg-background"
+              aria-label="Prethodni dan"
+            >
+              ‹
+            </button>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="rounded-lg border border-line bg-white px-2 py-1 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setDate(shiftDate(date, 1))}
+              className="rounded-xl px-3 py-2 text-lg hover:bg-background"
+              aria-label="Sledeći dan"
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: lastDay }, (_, index) => index + 1).map((day) => {
+              const iso = isoDate(year, month, day);
+              const active = period === "day" && selectedDay === day;
+              const hasData = daysWithData.has(iso);
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  onClick={() => {
+                    setPeriod("day");
+                    setDate(iso);
+                  }}
+                  className={`rounded-lg py-1.5 text-xs ${
+                    active
+                      ? "bg-brand text-white"
+                      : hasData
+                        ? "bg-background font-medium text-brand"
+                        : "text-muted hover:bg-background"
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {error ? <p className="text-sm text-accent">{error}</p> : null}
+
+      {report ? (
+        <>
+          <div className="rounded-2xl border-2 border-brand bg-card p-4 text-sm">
+            <p className="font-semibold">Kolektiv</p>
+            <p className="mt-1 text-muted">
+              {formatPoints(report.collective.furnitureQuantity)} kom ·{" "}
+              {formatPoints(report.collective.furniturePoints)} bod ·{" "}
+              {formatRsd(report.collective.stimulationRsd)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-line bg-card p-4 text-sm">
+            <p className="font-medium capitalize">{report.label}</p>
+            <p className="mt-1 text-muted">
+              {period === "day"
+                ? `Norma smene: ${formatHours(report.workdayHours)}h`
+                : `Norma: ${formatHours(report.workdayHours)}h × ${report.weekdayCount} radnih dana = ${formatHours(report.expectedHours)}h`}
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-line bg-card">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-background text-xs text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Radnik</th>
+                  <th className="px-3 py-2 font-medium">Sati</th>
+                  <th
+                    className={`px-3 py-2 font-medium ${monthEndHighlight ? "text-red-700" : ""}`}
+                  >
+                    Sati meseca
+                  </th>
+                  <th className="px-3 py-2 font-medium">{percentLabel}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.rows.map((row) => (
+                  <tr key={row.workerId} className="border-t border-line">
+                    <td className="px-3 py-2">
+                      {row.workerName}
+                      {row.active ? "" : " (neaktivan)"}
+                    </td>
+                    <td className="px-3 py-2">{formatHours(row.hours)}</td>
+                    <td
+                      className={`px-3 py-2 font-semibold ${
+                        monthEndHighlight ? "text-red-700" : ""
+                      }`}
+                    >
+                      {monthEndHighlight
+                        ? `${formatHours(row.monthHours)}h ukupno`
+                        : `${formatHours(row.monthHours)}h`}
+                    </td>
+                    <td className="px-3 py-2">{formatPercent(row.hoursPercent)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {sums ? (
+                <tfoot>
+                  <tr className="border-t border-line bg-background font-medium">
+                    <td className="px-3 py-2">Ukupno sati</td>
+                    <td className="px-3 py-2">{formatHours(sums.hours)}</td>
+                    <td className={monthEndHighlight ? "px-3 py-2 text-red-700" : "px-3 py-2"}>
+                      {formatHours(sums.monthHours)}h
+                    </td>
+                    <td className="px-3 py-2" />
+                  </tr>
+                  <tr className="border-t border-line bg-background">
+                    <td className="px-3 py-2 font-medium">Nameštaj</td>
+                    <td className="px-3 py-2 font-medium" colSpan={2}>
+                      {formatPoints(report.collective.furnitureQuantity)} kom
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowFurniture((open) => !open)}
+                        disabled={report.collective.assemblies.length === 0}
+                        className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                      >
+                        {showFurniture ? "Zatvori" : "Pregled"}
+                      </button>
+                    </td>
+                  </tr>
+                  {showFurniture
+                    ? report.collective.assemblies.map((item) => (
+                        <tr key={item.name} className="border-t border-line text-sm">
+                          <td className="px-3 py-2">{item.name}</td>
+                          <td className="px-3 py-2">
+                            {formatPoints(item.quantity)} kom
+                          </td>
+                          <td className="px-3 py-2 text-muted" colSpan={2}>
+                            {formatPoints(item.points)} bod
+                          </td>
+                        </tr>
+                      ))
+                    : null}
+                </tfoot>
+              ) : null}
+            </table>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}

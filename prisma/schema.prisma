@@ -1,0 +1,78 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         String
+  createdAt    DateTime @default(now())
+}
+
+model Worker {
+  id        String       @id @default(cuid())
+  name      String
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  entries   DailyEntry[]
+}
+
+model FurnitureType {
+  id             String                @id @default(cuid())
+  name           String
+  pointsPerPiece Float
+  active         Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  lines          AssemblyLine[]
+  collective     CollectiveAssembly[]
+}
+
+model DailyEntry {
+  id          String         @id @default(cuid())
+  workerId    String
+  date        String
+  hoursWorked Float
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  worker      Worker         @relation(fields: [workerId], references: [id])
+  assemblies  AssemblyLine[]
+
+  @@unique([workerId, date])
+  @@index([date])
+}
+
+model AssemblyLine {
+  id              String        @id @default(cuid())
+  dailyEntryId    String
+  furnitureTypeId String
+  quantity        Float
+  dailyEntry      DailyEntry    @relation(fields: [dailyEntryId], references: [id], onDelete: Cascade)
+  furnitureType   FurnitureType @relation(fields: [furnitureTypeId], references: [id])
+
+  @@unique([dailyEntryId, furnitureTypeId])
+}
+
+model CollectiveAssembly {
+  id              String        @id @default(cuid())
+  date            String
+  furnitureTypeId String
+  quantity        Float
+  furnitureType   FurnitureType @relation(fields: [furnitureTypeId], references: [id])
+
+  @@unique([date, furnitureTypeId])
+  @@index([date])
+}
+
+model Settings {
+  id           String @id @default("default")
+  rsdPerPoint  Float  @default(100)
+  workdayHours Float  @default(8)
+}
