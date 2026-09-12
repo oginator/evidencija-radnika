@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageHeader } from "./PageHeader";
 
 type Worker = { id: string; name: string; active: boolean };
 
@@ -93,15 +94,13 @@ export function WorkersScreen() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Radnici</h1>
-        <p className="text-sm text-muted">
-          Dodajte radnika, promenite ime ili ga izbrišite iz evidencije.
-        </p>
-      </div>
+      <PageHeader
+        title="Radnici"
+        description="Dodajte radnika, promenite ime ili ga izbrišite iz evidencije."
+      />
       <form
         onSubmit={addWorker}
-        className="flex flex-col gap-2 rounded-2xl border border-line bg-card p-4 sm:flex-row"
+        className="flex flex-col gap-2 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5 sm:flex-row"
       >
         <input
           value={name}
@@ -127,7 +126,7 @@ export function WorkersScreen() {
           return (
             <li
               key={worker.id}
-              className="space-y-3 rounded-2xl border border-line bg-card p-4"
+              className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5"
             >
               <input
                 value={draft}

@@ -17,6 +17,7 @@ import {
   formatPoints,
   formatRsd,
 } from "@/lib/format";
+import { PageHeader } from "./PageHeader";
 
 type AssemblyDetail = { name: string; quantity: number; points: number };
 
@@ -125,18 +126,16 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Izveštaj</h1>
-        <p className="text-sm text-muted">
-          Dnevni pregled, 1–15., 16.–kraj ili ceo mesec.
-        </p>
-      </div>
+      <PageHeader
+        title="Izveštaj"
+        description="Dnevni pregled, 1–15., 16.–kraj ili ceo mesec."
+      />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <select
           value={month}
           onChange={(e) => setMonth(Number(e.target.value))}
-          className="rounded-xl border border-line bg-card px-3 py-2"
+          className="rounded-2xl border border-line bg-card px-3 py-2.5 shadow-sm shadow-slate-900/5"
         >
           {MONTH_NAMES.map((name, index) => (
             <option key={name} value={index + 1}>
@@ -147,7 +146,7 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
         <select
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
-          className="rounded-xl border border-line bg-card px-3 py-2"
+          className="rounded-2xl border border-line bg-card px-3 py-2.5 shadow-sm shadow-slate-900/5"
         >
           {[year - 1, year, year + 1]
             .filter((value, index, all) => all.indexOf(value) === index)
@@ -160,8 +159,10 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
         <button
           type="button"
           onClick={() => setPeriod("day")}
-          className={`rounded-xl px-3 py-2 text-sm ${
-            period === "day" ? "bg-brand text-white" : "border border-line bg-card"
+          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
+            period === "day"
+              ? "bg-brand text-white shadow-sm shadow-brand/30"
+              : "border border-line bg-card hover:border-brand/40"
           }`}
         >
           Dan
@@ -169,8 +170,10 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
         <button
           type="button"
           onClick={() => setPeriod("first")}
-          className={`rounded-xl px-3 py-2 text-sm ${
-            period === "first" ? "bg-brand text-white" : "border border-line bg-card"
+          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
+            period === "first"
+              ? "bg-brand text-white shadow-sm shadow-brand/30"
+              : "border border-line bg-card hover:border-brand/40"
           }`}
         >
           1–15.
@@ -178,8 +181,10 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
         <button
           type="button"
           onClick={() => setPeriod("second")}
-          className={`rounded-xl px-3 py-2 text-sm ${
-            period === "second" ? "bg-brand text-white" : "border border-line bg-card"
+          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
+            period === "second"
+              ? "bg-brand text-white shadow-sm shadow-brand/30"
+              : "border border-line bg-card hover:border-brand/40"
           }`}
         >
           16–kraj
@@ -187,8 +192,10 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
         <button
           type="button"
           onClick={() => setPeriod("month")}
-          className={`rounded-xl px-3 py-2 text-sm ${
-            period === "month" ? "bg-brand text-white" : "border border-line bg-card"
+          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
+            period === "month"
+              ? "bg-brand text-white shadow-sm shadow-brand/30"
+              : "border border-line bg-card hover:border-brand/40"
           }`}
         >
           Ceo mesec
@@ -196,7 +203,7 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
       </div>
 
       {period === "day" ? (
-        <div className="space-y-3 rounded-2xl border border-line bg-card p-3">
+        <div className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
@@ -254,7 +261,7 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
 
       {report ? (
         <>
-          <div className="rounded-2xl border-2 border-brand bg-card p-4 text-sm">
+          <div className="rounded-3xl border border-brand/40 bg-card p-4 text-sm shadow-sm shadow-brand/10">
             <p className="font-semibold">Kolektiv</p>
             <p className="mt-1 text-muted">
               {formatPoints(report.collective.furnitureQuantity)} kom ·{" "}
@@ -262,7 +269,7 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
               {formatRsd(report.collective.stimulationRsd)}
             </p>
           </div>
-          <div className="rounded-2xl border border-line bg-card p-4 text-sm">
+          <div className="rounded-3xl border border-line bg-card p-4 text-sm shadow-sm shadow-slate-900/5">
             <p className="font-medium capitalize">{report.label}</p>
             <p className="mt-1 text-muted">
               {period === "day"
@@ -270,7 +277,7 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                 : `Norma: ${formatHours(report.workdayHours)}h × ${report.weekdayCount} radnih dana = ${formatHours(report.expectedHours)}h`}
             </p>
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-line bg-card">
+          <div className="overflow-x-auto rounded-3xl border border-line bg-card shadow-sm shadow-slate-900/5">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-background text-xs text-muted">
                 <tr>

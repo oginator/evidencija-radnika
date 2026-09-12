@@ -33,20 +33,20 @@ export function LoginForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 shadow-sm"
+      className="w-full rounded-3xl border border-line/80 bg-white p-7 shadow-xl shadow-slate-900/10"
     >
-      <h1 className="text-2xl font-semibold tracking-tight text-brand">
+      <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground">
         Evidencija radnika
       </h1>
-      <p className="mt-1 text-sm text-muted">
-        Unesite nalog vlasnika ili operatera.
+      <p className="mt-1 text-center text-sm text-muted">
+        Prijava za vlasnika ili operatera.
       </p>
-      <label className="mt-6 block text-sm font-medium">
+      <label className="mt-7 block text-sm font-medium">
         Korisničko ime
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5"
+          className="mt-1.5 w-full rounded-2xl border border-line bg-background px-3.5 py-3"
           autoComplete="username"
           required
         />
@@ -57,7 +57,7 @@ export function LoginForm() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5"
+          className="mt-1.5 w-full rounded-2xl border border-line bg-background px-3.5 py-3"
           autoComplete="current-password"
           required
         />
@@ -66,14 +66,10 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="mt-6 w-full rounded-xl bg-brand py-3 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+        className="mt-6 w-full rounded-2xl bg-brand py-3.5 font-medium text-white shadow-sm shadow-brand/30 transition hover:bg-brand-dark disabled:opacity-60"
       >
         {pending ? "Prijava..." : "Prijavi se"}
       </button>
-      <p className="mt-4 text-xs leading-5 text-muted">
-        Demo nalozi: <strong>vlasnik / vlasnik123</strong> i{" "}
-        <strong>operater / operater123</strong>
-      </p>
     </form>
   );
 }

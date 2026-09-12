@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageHeader } from "./PageHeader";
 
 type Item = {
   id: string;
@@ -113,15 +114,13 @@ export function FurnitureScreen() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Nameštaj i bodovi</h1>
-        <p className="text-sm text-muted">
-          Ovde dodajete komade i menjate naziv ili koliko bodova donosi svaki.
-        </p>
-      </div>
+      <PageHeader
+        title="Nameštaj i bodovi"
+        description="Ovde dodajete komade i menjate naziv ili koliko bodova donosi svaki."
+      />
       <form
         onSubmit={addItem}
-        className="grid gap-2 rounded-2xl border border-line bg-card p-4 sm:grid-cols-[1fr_8rem_auto]"
+        className="grid gap-2 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5 sm:grid-cols-[1fr_8rem_auto]"
       >
         <input
           value={name}
@@ -162,7 +161,7 @@ export function FurnitureScreen() {
           return (
             <li
               key={item.id}
-              className="space-y-3 rounded-2xl border border-line bg-card p-4"
+              className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5"
             >
               <div className="grid gap-2 sm:grid-cols-[1fr_7rem]">
                 <label className="text-xs font-medium text-muted">

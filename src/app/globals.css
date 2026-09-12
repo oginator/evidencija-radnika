@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4efe6;
-  --foreground: #1c1914;
-  --brand: #1f4d3a;
-  --brand-dark: #16382a;
-  --accent: #c45c26;
-  --card: #fffdf8;
-  --muted: #6b6258;
-  --line: #e4d9cc;
+  --background: #f3f6f9;
+  --foreground: #1b1f24;
+  --brand: #0a8ec8;
+  --brand-dark: #066a96;
+  --accent: #c62828;
+  --card: #ffffff;
+  --muted: #5c6770;
+  --line: #d7e1e8;
 }
 
 @theme inline {
@@ -29,7 +29,10 @@ html {
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 420px at 8% -10%, #d7f0fb 0%, transparent 55%),
+    radial-gradient(900px 360px at 100% 0%, #e8eef3 0%, transparent 50%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
@@ -39,4 +42,18 @@ select,
 button,
 textarea {
   font: inherit;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgb(10 142 200 / 16%);
 }

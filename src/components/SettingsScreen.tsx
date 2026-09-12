@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatRsd } from "@/lib/format";
+import { PageHeader } from "./PageHeader";
 
 export function SettingsScreen() {
   const [rsdPerPoint, setRsdPerPoint] = useState("");
@@ -78,8 +79,8 @@ export function SettingsScreen() {
   return (
     <div className="space-y-4">
       <form onSubmit={save} className="space-y-4">
-        <h1 className="text-xl font-semibold">Podešavanja</h1>
-        <label className="block rounded-2xl border border-line bg-card p-4 text-sm font-medium">
+        <PageHeader title="Podešavanja" />
+        <label className="block rounded-3xl border border-line bg-card p-4 text-sm font-medium shadow-sm shadow-slate-900/5">
           Vrednost jednog boda
           <input
             type="number"
@@ -94,7 +95,7 @@ export function SettingsScreen() {
             Stimulacija kolektiva = bodovi iz proizvoda × {formatRsd(Number(rsdPerPoint) || 0)}
           </span>
         </label>
-        <label className="block rounded-2xl border border-line bg-card p-4 text-sm font-medium">
+        <label className="block rounded-3xl border border-line bg-card p-4 text-sm font-medium shadow-sm shadow-slate-900/5">
           Nova lozinka vlasnika
           <input
             type="password"
@@ -104,7 +105,7 @@ export function SettingsScreen() {
             placeholder="Ostavi prazno ako ne menjate"
           />
         </label>
-        <label className="block rounded-2xl border border-line bg-card p-4 text-sm font-medium">
+        <label className="block rounded-3xl border border-line bg-card p-4 text-sm font-medium shadow-sm shadow-slate-900/5">
           Nova lozinka operatera
           <input
             type="password"
@@ -125,7 +126,7 @@ export function SettingsScreen() {
         </button>
       </form>
 
-      <section className="rounded-2xl border border-red-200 bg-red-50 p-4">
+      <section className="rounded-3xl border border-red-200 bg-red-50 p-4">
         <h2 className="text-lg font-semibold text-red-800">Reset podataka</h2>
         <p className="mt-1 text-sm text-red-800/80">
           Briše sve sate, izbačene proizvode i istoriju. Radnici, nameštaj i

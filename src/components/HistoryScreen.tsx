@@ -9,6 +9,7 @@ import {
   formatPoints,
   formatRsd,
 } from "@/lib/format";
+import { PageHeader } from "./PageHeader";
 
 type MonthRow = {
   year: number;
@@ -41,12 +42,10 @@ export function HistoryScreen() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Istorija po mesecima</h1>
-        <p className="text-sm text-muted">
-          Klik na mesec otvara oba perioda (1–15. i 16.–kraj).
-        </p>
-      </div>
+      <PageHeader
+        title="Istorija po mesecima"
+        description="Klik na mesec otvara oba perioda (1–15. i 16.–kraj)."
+      />
       {error ? <p className="text-sm text-accent">{error}</p> : null}
       {!loaded ? (
         <p className="text-sm text-muted">Učitavanje...</p>
@@ -54,7 +53,7 @@ export function HistoryScreen() {
         <p className="text-sm text-muted">Još nema sačuvanih meseci.</p>
       ) : null}
 
-      <div className="space-y-2 rounded-2xl border border-line bg-card p-4">
+      <div className="space-y-2 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
         {months.map((row) => (
           <div key={`${row.year}-${row.month}`} className="space-y-1">
             <div className="flex justify-between text-xs text-muted">
@@ -77,7 +76,7 @@ export function HistoryScreen() {
         {months.map((row) => (
           <li
             key={`${row.year}-${row.month}-card`}
-            className="rounded-2xl border border-line bg-card p-4"
+            className="rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5"
           >
             <p className="font-medium capitalize">
               {MONTH_NAMES[row.month - 1]} {row.year}.
@@ -89,25 +88,25 @@ export function HistoryScreen() {
             <div className="mt-3 flex flex-wrap gap-2">
               <Link
                 href={`/izvestaj?year=${row.year}&month=${row.month}&period=day&date=${row.year}-${String(row.month).padStart(2, "0")}-01`}
-                className="rounded-xl bg-background px-3 py-2 text-sm"
+                className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
               >
                 Dani
               </Link>
               <Link
                 href={`/izvestaj?year=${row.year}&month=${row.month}&period=first`}
-                className="rounded-xl bg-background px-3 py-2 text-sm"
+                className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
               >
                 1–15.
               </Link>
               <Link
                 href={`/izvestaj?year=${row.year}&month=${row.month}&period=second`}
-                className="rounded-xl bg-background px-3 py-2 text-sm"
+                className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
               >
                 16–kraj
               </Link>
               <Link
                 href={`/izvestaj?year=${row.year}&month=${row.month}&period=month`}
-                className="rounded-xl bg-background px-3 py-2 text-sm"
+                className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
               >
                 Ceo mesec
               </Link>

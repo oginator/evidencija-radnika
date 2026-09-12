@@ -150,7 +150,7 @@ export function DailyEntryScreen() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3 rounded-2xl border border-line bg-card p-3">
+      <div className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
@@ -163,7 +163,7 @@ export function DailyEntryScreen() {
           <div className="text-center">
             <p
               className={`text-sm font-semibold capitalize ${
-                viewingToday ? "text-emerald-700" : ""
+                viewingToday ? "text-brand" : ""
               }`}
             >
               {formatDisplayDate(date)}
@@ -174,14 +174,14 @@ export function DailyEntryScreen() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className={`mt-1 rounded-lg border bg-white px-2 py-1 text-sm ${
-                viewingToday ? "border-emerald-500" : "border-line"
+                viewingToday ? "border-brand" : "border-line"
               }`}
             />
             {!viewingToday ? (
               <button
                 type="button"
                 onClick={() => setDate(today)}
-                className="mt-2 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white"
+                className="mt-2 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white"
               >
                 Idi na danas
               </button>
@@ -209,8 +209,8 @@ export function DailyEntryScreen() {
                 className={`rounded-lg py-1.5 text-xs ${
                   isToday
                     ? selected
-                      ? "bg-emerald-600 font-semibold text-white"
-                      : "bg-emerald-100 font-semibold text-emerald-800"
+                      ? "bg-brand font-semibold text-white"
+                      : "bg-sky-100 font-semibold text-brand-dark"
                     : selected
                       ? "bg-brand text-white"
                       : "text-muted hover:bg-background"
@@ -227,7 +227,7 @@ export function DailyEntryScreen() {
       {loading ? <p className="text-sm text-muted">Učitavanje...</p> : null}
 
       {!loading ? (
-        <section className="rounded-2xl border-2 border-brand bg-card p-4 shadow-sm">
+        <section className="rounded-3xl border border-brand/40 bg-card p-4 shadow-sm shadow-brand/10">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Kolektiv</h2>
@@ -331,7 +331,7 @@ export function DailyEntryScreen() {
 
       {!loading && workers.length > 0 ? (
         <div
-          className={`rounded-2xl border p-4 ${
+          className={`rounded-3xl border p-4 shadow-sm shadow-slate-900/5 ${
             monthEnd
               ? "border-red-400 bg-red-50 text-red-800"
               : "border-line bg-card"
@@ -363,7 +363,7 @@ export function DailyEntryScreen() {
         return (
           <section
             key={worker.id}
-            className={`rounded-2xl border p-4 shadow-sm ${
+            className={`rounded-3xl border p-4 shadow-sm shadow-slate-900/5 ${
               monthEnd ? "border-red-400 bg-red-50" : "border-line bg-card"
             }`}
           >
