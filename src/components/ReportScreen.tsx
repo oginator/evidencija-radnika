@@ -117,7 +117,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
     (acc, row) => ({
       hours: acc.hours + row.hours,
       monthHours: acc.monthHours + row.monthHours,
-      stimulationRsd: acc.stimulationRsd + row.stimulationRsd,
+      stimulationRsd: acc.stimulationRsd + (row.stimulationRsd ?? 0),
     }),
     { hours: 0, monthHours: 0, stimulationRsd: 0 },
   );
