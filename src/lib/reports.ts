@@ -16,6 +16,9 @@ export type ReportRow = {
   monthHours: number;
   expectedHours: number;
   hoursPercent: number;
+  monthHoursPercent: number;
+  equalShareRsd: number;
+  stimulationRsd: number;
 };
 
 export type CollectiveSummary = {
@@ -23,7 +26,26 @@ export type CollectiveSummary = {
   furnitureQuantity: number;
   furniturePoints: number;
   stimulationRsd: number;
+  workerCount: number;
+  equalShareRsd: number;
+  paidStimulationRsd: number;
 };
+
+export function workerCollectiveBonus(
+  totalRsd: number,
+  workerCount: number,
+  monthHours: number,
+  monthExpectedHours: number,
+) {
+  const equalShareRsd = workerCount > 0 ? totalRsd / workerCount : 0;
+  const monthHoursPercent =
+    monthExpectedHours > 0 ? (monthHours / monthExpectedHours) * 100 : 0;
+  return {
+    equalShareRsd,
+    monthHoursPercent,
+    stimulationRsd: equalShareRsd * (monthHoursPercent / 100),
+  };
+}
 
 export async function getSettings() {
   const existing = await prisma.settings.findUnique({ where: { id: "default" } });
@@ -52,7 +74,8 @@ export async function buildReport(
   const { from, to } = periodRange(year, month, period, date);
   const monthFrom = `${year}-${String(month).padStart(2, "0")}-01`;
   const monthTo = periodRange(year, month, "second").to;
-  const expected = expectedHours(year, month, settings.workdayHours);
+  const monthExpected = expectedHours(year, month, settings.workdayHours);
+  const expected = monthExpected;
   const isDay = period === "day";
 
   const [entries, collectiveLines] = await Promise.all([
@@ -111,19 +134,31 @@ export async function buildReport(
     }
   }
 
+  const workerCount = [...byWorker.values()].filter((row) => row.active).length;
+  const collective = summarizeCollective(collectiveLines, settings.rsdPerPoint);
+  const equalShareRsd =
+    workerCount > 0 ? collective.stimulationRsd / workerCount : 0;
+
   const rows: ReportRow[] = [...byWorker.values()]
     .map((row) => {
       const percentBase = isDay ? settings.workdayHours : expected;
       const percentHours = isDay ? row.hours : row.monthHours;
+      const bonus = workerCollectiveBonus(
+        collective.stimulationRsd,
+        workerCount,
+        row.monthHours,
+        monthExpected,
+      );
       return {
         ...row,
         expectedHours: isDay ? settings.workdayHours : expected,
         hoursPercent: percentBase > 0 ? (percentHours / percentBase) * 100 : 0,
+        monthHoursPercent: bonus.monthHoursPercent,
+        equalShareRsd: bonus.equalShareRsd,
+        stimulationRsd: row.active ? bonus.stimulationRsd : 0,
       };
     })
     .sort((a, b) => a.workerName.localeCompare(b.workerName, "sr"));
-
-  const collective = summarizeCollective(collectiveLines, settings.rsdPerPoint);
   const allCollectiveDates = await prisma.collectiveAssembly.findMany({
     where: { date: { gte: monthFrom, lte: monthTo } },
     select: { date: true },
@@ -136,6 +171,9 @@ export async function buildReport(
       furnitureQuantity: collective.furnitureQuantity,
       furniturePoints: collective.furniturePoints,
       stimulationRsd: collective.stimulationRsd,
+      workerCount,
+      equalShareRsd,
+      paidStimulationRsd: rows.reduce((sum, row) => sum + row.stimulationRsd, 0),
     },
     rsdPerPoint: settings.rsdPerPoint,
     workdayHours: settings.workdayHours,

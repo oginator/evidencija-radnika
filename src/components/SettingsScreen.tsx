@@ -92,7 +92,9 @@ export function SettingsScreen() {
             required
           />
           <span className="mt-1 block text-xs font-normal text-muted">
-            Stimulacija kolektiva = bodovi iz proizvoda × {formatRsd(Number(rsdPerPoint) || 0)}
+            Ukupan iznos = bodovi × {formatRsd(Number(rsdPerPoint) || 0)}.
+            Na izveštaju se deli na radnike, pa svako dobije taj deo × %
+            mesečne norme sati.
           </span>
         </label>
         <label className="block rounded-3xl border border-line bg-card p-4 text-sm font-medium shadow-sm shadow-slate-900/5">

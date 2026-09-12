@@ -29,6 +29,9 @@ type Row = {
   monthHours: number;
   expectedHours: number;
   hoursPercent: number;
+  monthHoursPercent: number;
+  equalShareRsd: number;
+  stimulationRsd: number;
 };
 
 type Collective = {
@@ -36,6 +39,9 @@ type Collective = {
   furnitureQuantity: number;
   furniturePoints: number;
   stimulationRsd: number;
+  workerCount: number;
+  equalShareRsd: number;
+  paidStimulationRsd: number;
 };
 
 type Report = {
@@ -111,8 +117,9 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
     (acc, row) => ({
       hours: acc.hours + row.hours,
       monthHours: acc.monthHours + row.monthHours,
+      stimulationRsd: acc.stimulationRsd + row.stimulationRsd,
     }),
-    { hours: 0, monthHours: 0 },
+    { hours: 0, monthHours: 0, stimulationRsd: 0 },
   );
 
   const lastDay = lastDayOfMonthNum(year, month);
@@ -268,6 +275,19 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
               {formatPoints(report.collective.furniturePoints)} bod ·{" "}
               {formatRsd(report.collective.stimulationRsd)}
             </p>
+            <p className="mt-2 text-sm">
+              {formatRsd(report.collective.stimulationRsd)} ÷{" "}
+              {report.collective.workerCount} radnika ={" "}
+              <strong>{formatRsd(report.collective.equalShareRsd)}</strong> po
+              radniku
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Svako dobija taj iznos × % ostvarene mesečne norme sati. Npr. 70%
+              norme = 70% od {formatRsd(report.collective.equalShareRsd)}.
+            </p>
+            <p className="mt-2 font-medium text-brand">
+              Za isplatu: {formatRsd(report.collective.paidStimulationRsd)}
+            </p>
           </div>
           <div className="rounded-3xl border border-line bg-card p-4 text-sm shadow-sm shadow-slate-900/5">
             <p className="font-medium capitalize">{report.label}</p>
@@ -289,6 +309,10 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                     Sati meseca
                   </th>
                   <th className="px-3 py-2 font-medium">{percentLabel}</th>
+                  {period === "day" ? (
+                    <th className="px-3 py-2 font-medium">% meseca</th>
+                  ) : null}
+                  <th className="px-3 py-2 font-medium">Stimulacija</th>
                 </tr>
               </thead>
               <tbody>
@@ -309,6 +333,14 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                         : `${formatHours(row.monthHours)}h`}
                     </td>
                     <td className="px-3 py-2">{formatPercent(row.hoursPercent)}</td>
+                    {period === "day" ? (
+                      <td className="px-3 py-2">
+                        {formatPercent(row.monthHoursPercent)}
+                      </td>
+                    ) : null}
+                    <td className="px-3 py-2 font-semibold text-brand">
+                      {formatRsd(row.stimulationRsd)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -321,13 +353,17 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                       {formatHours(sums.monthHours)}h
                     </td>
                     <td className="px-3 py-2" />
+                    {period === "day" ? <td className="px-3 py-2" /> : null}
+                    <td className="px-3 py-2 text-brand">
+                      {formatRsd(sums.stimulationRsd)}
+                    </td>
                   </tr>
                   <tr className="border-t border-line bg-background">
                     <td className="px-3 py-2 font-medium">Nameštaj</td>
-                    <td className="px-3 py-2 font-medium" colSpan={2}>
+                    <td className="px-3 py-2 font-medium" colSpan={period === "day" ? 3 : 2}>
                       {formatPoints(report.collective.furnitureQuantity)} kom
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2" colSpan={2}>
                       <button
                         type="button"
                         onClick={() => setShowFurniture((open) => !open)}
@@ -345,7 +381,7 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                           <td className="px-3 py-2">
                             {formatPoints(item.quantity)} kom
                           </td>
-                          <td className="px-3 py-2 text-muted" colSpan={2}>
+                          <td className="px-3 py-2 text-muted" colSpan={period === "day" ? 4 : 3}>
                             {formatPoints(item.points)} bod
                           </td>
                         </tr>
