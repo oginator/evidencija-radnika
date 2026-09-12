@@ -12,16 +12,17 @@ import {
 } from "@/lib/period";
 import { formatHours, formatPoints, formatRsd } from "@/lib/format";
 
-type Furniture = { id: string; name: string; pointsPerPiece: number };
+type Furniture = { id: string; name: string; pointsPerPiece?: number };
 type Worker = { id: string; name: string };
 type Line = { furnitureTypeId: string; quantity: number };
 type WorkerDraft = { hoursWorked: string; saved: boolean; saving: boolean };
 
-export function DailyEntryScreen() {
+export function DailyEntryScreen({ owner }: { owner: boolean }) {
   const [date, setDate] = useState(todayISO);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [furniture, setFurniture] = useState<Furniture[]>([]);
   const [rsdPerPoint, setRsdPerPoint] = useState(100);
+  const [monthFurnitureQuantity, setMonthFurnitureQuantity] = useState(0);
   const [monthHoursOther, setMonthHoursOther] = useState<Record<string, number>>({});
   const [drafts, setDrafts] = useState<Record<string, WorkerDraft>>({});
   const [collective, setCollective] = useState<Line[]>([]);
@@ -43,7 +44,8 @@ export function DailyEntryScreen() {
     }
     setWorkers(data.workers);
     setFurniture(data.furniture);
-    setRsdPerPoint(data.rsdPerPoint);
+    setRsdPerPoint(data.rsdPerPoint ?? 0);
+    setMonthFurnitureQuantity(data.monthFurnitureQuantity ?? 0);
     setMonthHoursOther(data.monthHoursOther ?? {});
     const next: Record<string, WorkerDraft> = {};
     for (const worker of data.workers as Worker[]) {
@@ -119,6 +121,7 @@ export function DailyEntryScreen() {
       return;
     }
     setCollectiveSaved(true);
+    await load(date);
   }
 
   function furnitureName(id: string) {
@@ -232,7 +235,9 @@ export function DailyEntryScreen() {
             <div>
               <h2 className="text-lg font-semibold">Kolektiv</h2>
               <p className="text-xs text-muted">
-                Bodovi iz proizvoda važe za sve radnike zajedno.
+                {owner
+                  ? "Bodovi iz proizvoda važe za sve radnike zajedno."
+                  : "Ovde unosite koliko je komada izbačeno."}
               </p>
             </div>
             {collectiveSaved ? (
@@ -242,7 +247,9 @@ export function DailyEntryScreen() {
             )}
           </div>
           <p className="mt-3 rounded-xl bg-background px-3 py-2 text-sm font-semibold text-brand">
-            {formatPoints(collectivePoints)} bod · {formatRsd(collectivePoints * rsdPerPoint)}
+            {owner
+              ? `${formatPoints(collectivePoints)} bod · ${formatRsd(collectivePoints * rsdPerPoint)}`
+              : `${formatPoints(monthFurnitureQuantity)} kom ovog meseca`}
           </p>
           <p className="mt-4 text-sm font-medium">Izbaceni proizvodi</p>
           <ul className="mt-2 space-y-2">
@@ -252,10 +259,13 @@ export function DailyEntryScreen() {
                 className="flex items-center justify-between rounded-xl bg-background px-3 py-2 text-sm"
               >
                 <span>
-                  {furnitureName(line.furnitureTypeId)} × {line.quantity}{" "}
-                  <span className="text-muted">
-                    ({formatPoints(line.quantity * furniturePoints(line.furnitureTypeId))} bod)
-                  </span>
+                  {furnitureName(line.furnitureTypeId)} × {line.quantity}
+                  {owner ? (
+                    <span className="text-muted">
+                      {" "}
+                      ({formatPoints(line.quantity * furniturePoints(line.furnitureTypeId))} bod)
+                    </span>
+                  ) : null}
                 </span>
                 <button
                   type="button"
@@ -280,7 +290,9 @@ export function DailyEntryScreen() {
             >
               {furniture.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name} ({formatPoints(item.pointsPerPiece)} bod)
+                  {owner
+                    ? `${item.name} (${formatPoints(item.pointsPerPiece ?? 0)} bod)`
+                    : item.name}
                 </option>
               ))}
             </select>
@@ -390,7 +402,7 @@ export function DailyEntryScreen() {
               <input
                 type="number"
                 min={0}
-                max={24}
+                max={400}
                 step={0.5}
                 inputMode="decimal"
                 value={draft.hoursWorked}

@@ -19,7 +19,7 @@ import {
 } from "@/lib/format";
 import { PageHeader } from "./PageHeader";
 
-type AssemblyDetail = { name: string; quantity: number; points: number };
+type AssemblyDetail = { name: string; quantity: number; points?: number };
 
 type Row = {
   workerId: string;
@@ -30,18 +30,18 @@ type Row = {
   expectedHours: number;
   hoursPercent: number;
   monthHoursPercent: number;
-  equalShareRsd: number;
-  stimulationRsd: number;
+  equalShareRsd?: number;
+  stimulationRsd?: number;
 };
 
 type Collective = {
   assemblies: AssemblyDetail[];
   furnitureQuantity: number;
-  furniturePoints: number;
-  stimulationRsd: number;
+  furniturePoints?: number;
+  stimulationRsd?: number;
   workerCount: number;
-  equalShareRsd: number;
-  paidStimulationRsd: number;
+  equalShareRsd?: number;
+  paidStimulationRsd?: number;
 };
 
 type Report = {
@@ -51,7 +51,7 @@ type Report = {
   date: string;
   label: string;
   lastDay: number;
-  rsdPerPoint: number;
+  rsdPerPoint?: number;
   workdayHours: number;
   expectedHours: number;
   weekdayCount: number;
@@ -60,7 +60,7 @@ type Report = {
   collective: Collective;
 };
 
-export function ReportScreen({ owner: _owner }: { owner: boolean }) {
+export function ReportScreen({ owner }: { owner: boolean }) {
   const searchParams = useSearchParams();
   const today = todayISO();
   const [period, setPeriod] = useState<PeriodKey>(
@@ -270,24 +270,36 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
         <>
           <div className="rounded-3xl border border-brand/40 bg-card p-4 text-sm shadow-sm shadow-brand/10">
             <p className="font-semibold">Kolektiv</p>
-            <p className="mt-1 text-muted">
-              {formatPoints(report.collective.furnitureQuantity)} kom ·{" "}
-              {formatPoints(report.collective.furniturePoints)} bod ·{" "}
-              {formatRsd(report.collective.stimulationRsd)}
-            </p>
-            <p className="mt-2 text-sm">
-              {formatRsd(report.collective.stimulationRsd)} ÷{" "}
-              {report.collective.workerCount} radnika ={" "}
-              <strong>{formatRsd(report.collective.equalShareRsd)}</strong> po
-              radniku
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              Svako dobija taj iznos × % ostvarene mesečne norme sati. Npr. 70%
-              norme = 70% od {formatRsd(report.collective.equalShareRsd)}.
-            </p>
-            <p className="mt-2 font-medium text-brand">
-              Za isplatu: {formatRsd(report.collective.paidStimulationRsd)}
-            </p>
+            {owner ? (
+              <>
+                <p className="mt-1 text-muted">
+                  {formatPoints(report.collective.furnitureQuantity)} kom ·{" "}
+                  {formatPoints(report.collective.furniturePoints ?? 0)} bod ·{" "}
+                  {formatRsd(report.collective.stimulationRsd ?? 0)}
+                </p>
+                <p className="mt-2 text-sm">
+                  {formatRsd(report.collective.stimulationRsd ?? 0)} ÷{" "}
+                  {report.collective.workerCount} radnika ={" "}
+                  <strong>{formatRsd(report.collective.equalShareRsd ?? 0)}</strong>{" "}
+                  po radniku
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Svako dobija taj iznos × % ostvarene mesečne norme sati. Npr.
+                  70% norme = 70% od{" "}
+                  {formatRsd(report.collective.equalShareRsd ?? 0)}.
+                </p>
+                <p className="mt-2 font-medium text-brand">
+                  Za isplatu: {formatRsd(report.collective.paidStimulationRsd ?? 0)}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-muted">
+                Izbaceno:{" "}
+                <strong className="text-foreground">
+                  {formatPoints(report.collective.furnitureQuantity)} kom
+                </strong>
+              </p>
+            )}
           </div>
           <div className="rounded-3xl border border-line bg-card p-4 text-sm shadow-sm shadow-slate-900/5">
             <p className="font-medium capitalize">{report.label}</p>
@@ -312,7 +324,9 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                   {period === "day" ? (
                     <th className="px-3 py-2 font-medium">% meseca</th>
                   ) : null}
-                  <th className="px-3 py-2 font-medium">Stimulacija</th>
+                  {owner ? (
+                    <th className="px-3 py-2 font-medium">Stimulacija</th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -338,9 +352,11 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                         {formatPercent(row.monthHoursPercent)}
                       </td>
                     ) : null}
-                    <td className="px-3 py-2 font-semibold text-brand">
-                      {formatRsd(row.stimulationRsd)}
-                    </td>
+                    {owner ? (
+                      <td className="px-3 py-2 font-semibold text-brand">
+                        {formatRsd(row.stimulationRsd ?? 0)}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -354,16 +370,21 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                     </td>
                     <td className="px-3 py-2" />
                     {period === "day" ? <td className="px-3 py-2" /> : null}
-                    <td className="px-3 py-2 text-brand">
-                      {formatRsd(sums.stimulationRsd)}
-                    </td>
+                    {owner ? (
+                      <td className="px-3 py-2 text-brand">
+                        {formatRsd(sums.stimulationRsd)}
+                      </td>
+                    ) : null}
                   </tr>
                   <tr className="border-t border-line bg-background">
                     <td className="px-3 py-2 font-medium">Nameštaj</td>
-                    <td className="px-3 py-2 font-medium" colSpan={period === "day" ? 3 : 2}>
+                    <td
+                      className="px-3 py-2 font-medium"
+                      colSpan={period === "day" ? (owner ? 3 : 2) : owner ? 2 : 1}
+                    >
                       {formatPoints(report.collective.furnitureQuantity)} kom
                     </td>
-                    <td className="px-3 py-2" colSpan={2}>
+                    <td className="px-3 py-2" colSpan={owner ? 2 : 1}>
                       <button
                         type="button"
                         onClick={() => setShowFurniture((open) => !open)}
@@ -381,9 +402,16 @@ export function ReportScreen({ owner: _owner }: { owner: boolean }) {
                           <td className="px-3 py-2">
                             {formatPoints(item.quantity)} kom
                           </td>
-                          <td className="px-3 py-2 text-muted" colSpan={period === "day" ? 4 : 3}>
-                            {formatPoints(item.points)} bod
-                          </td>
+                          {owner ? (
+                            <td
+                              className="px-3 py-2 text-muted"
+                              colSpan={period === "day" ? 4 : 3}
+                            >
+                              {formatPoints(item.points ?? 0)} bod
+                            </td>
+                          ) : (
+                            <td className="px-3 py-2" colSpan={period === "day" ? 3 : 2} />
+                          )}
                         </tr>
                       ))
                     : null}

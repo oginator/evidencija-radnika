@@ -12,6 +12,11 @@ export async function GET() {
     where: { active: true },
     orderBy: { name: "asc" },
   });
+  if (session.role !== "owner") {
+    return NextResponse.json({
+      furniture: furniture.map(({ pointsPerPiece: _points, ...item }) => item),
+    });
+  }
   return NextResponse.json({ furniture });
 }
 

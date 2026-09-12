@@ -26,27 +26,38 @@ export async function GET(request: Request) {
 
   await migrateCollectiveFromWorkers();
   const { from: monthFrom, to: monthTo } = monthBounds(date);
-  const [workers, furniture, entries, monthEntries, collectiveLines, settings] =
-    await Promise.all([
-      prisma.worker.findMany({
-        where: { active: true },
-        orderBy: { name: "asc" },
-      }),
-      prisma.furnitureType.findMany({
-        where: { active: true },
-        orderBy: { name: "asc" },
-      }),
-      prisma.dailyEntry.findMany({ where: { date } }),
-      prisma.dailyEntry.findMany({
-        where: { date: { gte: monthFrom, lte: monthTo } },
-        select: { workerId: true, date: true, hoursWorked: true },
-      }),
-      prisma.collectiveAssembly.findMany({
-        where: { date },
-        include: { furnitureType: true },
-      }),
-      getSettings(),
-    ]);
+  const [
+    workers,
+    furniture,
+    entries,
+    monthEntries,
+    collectiveLines,
+    monthCollective,
+    settings,
+  ] = await Promise.all([
+    prisma.worker.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.furnitureType.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.dailyEntry.findMany({ where: { date } }),
+    prisma.dailyEntry.findMany({
+      where: { date: { gte: monthFrom, lte: monthTo } },
+      select: { workerId: true, date: true, hoursWorked: true },
+    }),
+    prisma.collectiveAssembly.findMany({
+      where: { date },
+      include: { furnitureType: true },
+    }),
+    prisma.collectiveAssembly.findMany({
+      where: { date: { gte: monthFrom, lte: monthTo } },
+      select: { quantity: true },
+    }),
+    getSettings(),
+  ]);
 
   const monthHoursOther: Record<string, number> = {};
   for (const entry of monthEntries) {
@@ -55,13 +66,32 @@ export async function GET(request: Request) {
       (monthHoursOther[entry.workerId] ?? 0) + entry.hoursWorked;
   }
 
+  const monthFurnitureQuantity = monthCollective.reduce(
+    (sum, line) => sum + line.quantity,
+    0,
+  );
+  const owner = session.role === "owner";
+  const collective = summarizeCollective(collectiveLines, settings.rsdPerPoint);
+
   return NextResponse.json({
     date,
     workers,
-    furniture,
-    rsdPerPoint: settings.rsdPerPoint,
+    furniture: owner
+      ? furniture
+      : furniture.map(({ pointsPerPiece: _points, ...item }) => item),
+    ...(owner ? { rsdPerPoint: settings.rsdPerPoint } : {}),
     monthHoursOther,
-    collective: summarizeCollective(collectiveLines, settings.rsdPerPoint),
+    monthFurnitureQuantity,
+    collective: owner
+      ? collective
+      : {
+          assemblies: collective.assemblies.map(({ name, quantity, furnitureTypeId }) => ({
+            furnitureTypeId,
+            name,
+            quantity,
+          })),
+          furnitureQuantity: collective.furnitureQuantity,
+        },
     entries: entries.map((entry) => ({
       workerId: entry.workerId,
       hoursWorked: entry.hoursWorked,
@@ -91,9 +121,9 @@ export async function PUT(request: Request) {
   if (!workerId) {
     return NextResponse.json({ error: "Nedostaje radnik." }, { status: 400 });
   }
-  if (!Number.isFinite(hoursWorked) || hoursWorked < 0 || hoursWorked > 24) {
+  if (!Number.isFinite(hoursWorked) || hoursWorked < 0 || hoursWorked > 400) {
     return NextResponse.json(
-      { error: "Sati moraju biti između 0 i 24." },
+      { error: "Sati moraju biti između 0 i 400." },
       { status: 400 },
     );
   }

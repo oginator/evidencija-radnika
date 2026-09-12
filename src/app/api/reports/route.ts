@@ -55,6 +55,7 @@ export async function GET(request: Request) {
 
   const report = await buildReport(year, month, period, date);
   const range = periodRange(year, month, period, date);
+  const owner = session.role === "owner";
 
   return NextResponse.json({
     year,
@@ -65,6 +66,28 @@ export async function GET(request: Request) {
     from: range.from,
     to: range.to,
     lastDay,
-    ...report,
+    workdayHours: report.workdayHours,
+    expectedHours: report.expectedHours,
+    weekdayCount: report.weekdayCount,
+    daysWithData: report.daysWithData,
+    ...(owner
+      ? {
+          rsdPerPoint: report.rsdPerPoint,
+          rows: report.rows,
+          collective: report.collective,
+        }
+      : {
+          rows: report.rows.map(
+            ({ stimulationRsd: _s, equalShareRsd: _e, ...row }) => row,
+          ),
+          collective: {
+            furnitureQuantity: report.collective.furnitureQuantity,
+            workerCount: report.collective.workerCount,
+            assemblies: report.collective.assemblies.map(({ name, quantity }) => ({
+              name,
+              quantity,
+            })),
+          },
+        }),
   });
 }

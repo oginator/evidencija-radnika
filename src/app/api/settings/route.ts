@@ -10,6 +10,9 @@ export async function GET() {
     return NextResponse.json({ error: "Niste prijavljeni." }, { status: 401 });
   }
   const settings = await getSettings();
+  if (session.role !== "owner") {
+    return NextResponse.json({ workdayHours: settings.workdayHours });
+  }
   return NextResponse.json({
     rsdPerPoint: settings.rsdPerPoint,
     workdayHours: settings.workdayHours,

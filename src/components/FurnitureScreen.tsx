@@ -6,13 +6,13 @@ import { PageHeader } from "./PageHeader";
 type Item = {
   id: string;
   name: string;
-  pointsPerPiece: number;
+  pointsPerPiece?: number;
   active: boolean;
 };
 
 type Draft = { name: string; points: string };
 
-export function FurnitureScreen() {
+export function FurnitureScreen({ owner }: { owner: boolean }) {
   const [items, setItems] = useState<Item[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [name, setName] = useState("");
@@ -34,7 +34,7 @@ export function FurnitureScreen() {
     for (const item of data.furniture as Item[]) {
       next[item.id] = {
         name: item.name,
-        points: String(item.pointsPerPiece),
+        points: item.pointsPerPiece === undefined ? "" : String(item.pointsPerPiece),
       };
     }
     setDrafts(next);
@@ -73,7 +73,7 @@ export function FurnitureScreen() {
       setError("Naziv ne može biti prazan.");
       return;
     }
-    if (!Number.isFinite(pointsPerPiece) || pointsPerPiece < 0) {
+    if (owner && (!Number.isFinite(pointsPerPiece) || pointsPerPiece < 0)) {
       setError("Unesite ispravne bodove.");
       return;
     }
@@ -83,10 +83,11 @@ export function FurnitureScreen() {
     const response = await fetch(`/api/furniture/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: draft.name.trim(),
-        pointsPerPiece,
-      }),
+      body: JSON.stringify(
+        owner
+          ? { name: draft.name.trim(), pointsPerPiece }
+          : { name: draft.name.trim() },
+      ),
     });
     const data = await response.json().catch(() => ({}));
     setSavingId("");
@@ -115,9 +116,14 @@ export function FurnitureScreen() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Nameštaj i bodovi"
-        description="Ovde dodajete komade i menjate naziv ili koliko bodova donosi svaki."
+        title={owner ? "Nameštaj i bodovi" : "Nameštaj"}
+        description={
+          owner
+            ? "Ovde dodajete komade i menjate naziv ili koliko bodova donosi svaki."
+            : "Šifarnik komada koje kolektiv izbacuje."
+        }
       />
+      {owner ? (
       <form
         onSubmit={addItem}
         className="grid gap-2 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5 sm:grid-cols-[1fr_8rem_auto]"
@@ -147,6 +153,7 @@ export function FurnitureScreen() {
           Dodaj
         </button>
       </form>
+      ) : null}
       {error ? <p className="text-sm text-accent">{error}</p> : null}
       {message ? <p className="text-sm text-brand">{message}</p> : null}
       <ul className="space-y-3">
@@ -155,15 +162,16 @@ export function FurnitureScreen() {
             name: item.name,
             points: String(item.pointsPerPiece),
           };
-          const dirty =
-            draft.name.trim() !== item.name ||
-            Number(draft.points) !== item.pointsPerPiece;
+          const dirty = owner
+            ? draft.name.trim() !== item.name ||
+              Number(draft.points) !== item.pointsPerPiece
+            : draft.name.trim() !== item.name;
           return (
             <li
               key={item.id}
               className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5"
             >
-              <div className="grid gap-2 sm:grid-cols-[1fr_7rem]">
+              <div className={`grid gap-2 ${owner ? "sm:grid-cols-[1fr_7rem]" : ""}`}>
                 <label className="text-xs font-medium text-muted">
                   Naziv
                   <input
@@ -177,6 +185,7 @@ export function FurnitureScreen() {
                     className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-base font-normal text-foreground"
                   />
                 </label>
+                {owner ? (
                 <label className="text-xs font-medium text-muted">
                   Bodovi
                   <input
@@ -193,6 +202,7 @@ export function FurnitureScreen() {
                     className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-base font-normal text-foreground"
                   />
                 </label>
+                ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
