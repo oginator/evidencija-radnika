@@ -160,7 +160,12 @@ export async function PUT(request: Request) {
   }
 
   if (hasHours) {
-    if (!Number.isFinite(hoursWorked) || hoursWorked < 0 || hoursWorked > 400) {
+    if (
+      hoursWorked === undefined ||
+      !Number.isFinite(hoursWorked) ||
+      hoursWorked < 0 ||
+      hoursWorked > 400
+    ) {
       return NextResponse.json(
         { error: "Sati moraju biti između 0 i 400." },
         { status: 400 },
