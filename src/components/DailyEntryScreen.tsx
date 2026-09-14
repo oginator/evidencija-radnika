@@ -624,7 +624,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                     type="button"
                     disabled={busy}
                     onClick={() => markAbsent(worker.id)}
-                    className="rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold leading-none text-white disabled:opacity-60"
+                    className="rounded-full border border-red-500 bg-transparent px-2 py-0.5 text-[10px] font-medium leading-none text-red-600 disabled:opacity-60"
                   >
                     {draft.markingAbsent ? "..." : "Nije radio"}
                   </button>
