@@ -36,14 +36,15 @@ model FurnitureType {
 }
 
 model DailyEntry {
-  id          String         @id @default(cuid())
-  workerId    String
-  date        String
-  hoursWorked Float
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  worker      Worker         @relation(fields: [workerId], references: [id])
-  assemblies  AssemblyLine[]
+  id              String         @id @default(cuid())
+  workerId        String
+  date            String
+  hoursWorked     Float
+  hoursConfirmed  Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  worker          Worker         @relation(fields: [workerId], references: [id])
+  assemblies      AssemblyLine[]
 
   @@unique([workerId, date])
   @@index([date])
