@@ -155,7 +155,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   useAutoRefresh(() => load(date, true));
 
   async function saveWorker(workerId: string, draft = drafts[workerId]) {
-    if (!draft || (!owner && draft.hoursConfirmed)) return;
+    if (!draft || owner || draft.hoursConfirmed) return;
     setDrafts((current) => ({
       ...current,
       [workerId]: { ...current[workerId], saving: true },
@@ -188,7 +188,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
 
   async function confirmWorker(workerId: string) {
     const draft = drafts[workerId];
-    if (!draft || draft.hoursConfirmed) return;
+    if (!draft || owner || draft.hoursConfirmed) return;
     const hoursWorked = draft.hoursWorked === "" ? 0 : Number(draft.hoursWorked);
     if (!Number.isFinite(hoursWorked) || hoursWorked <= 0) {
       setError("Unesite sate pa potvrdite.");
@@ -515,7 +515,8 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
       {workers.map((worker) => {
         const draft = drafts[worker.id];
         if (!draft) return null;
-        const locked = draft.hoursConfirmed && !owner;
+        const confirmed = draft.hoursConfirmed;
+        const hoursReadOnly = owner || confirmed;
         return (
           <section
             key={worker.id}
@@ -563,7 +564,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                 step={0.5}
                 inputMode="decimal"
                 value={draft.hoursWorked}
-                disabled={locked}
+                disabled={hoursReadOnly}
                 onChange={(e) =>
                   setDrafts((current) => ({
                     ...current,
@@ -575,14 +576,26 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                   }))
                 }
                 className={`mt-1 w-full rounded-xl border px-3 py-3 text-lg ${
-                  locked
+                  confirmed
                     ? "cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-900"
-                    : "border-line bg-white"
+                    : hoursReadOnly
+                      ? "cursor-not-allowed border-line bg-slate-50"
+                      : "border-line bg-white"
                 }`}
                 placeholder="npr. 8"
               />
             </label>
-            {locked ? null : (
+            {owner ? (
+              confirmed ? (
+                <button
+                  type="button"
+                  onClick={() => unlockWorker(worker.id)}
+                  className="mt-4 w-full rounded-xl border border-emerald-300 bg-white py-2.5 text-sm font-medium text-emerald-800"
+                >
+                  Otključaj
+                </button>
+              ) : null
+            ) : confirmed ? null : (
               <div className="mt-4 flex flex-col gap-2">
                 <button
                   type="button"
@@ -592,26 +605,14 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                 >
                   {draft.saving ? "Čuvam..." : "Sačuvaj sate"}
                 </button>
-                {draft.hoursConfirmed ? (
-                  owner ? (
-                    <button
-                      type="button"
-                      onClick={() => unlockWorker(worker.id)}
-                      className="w-full rounded-xl border border-emerald-300 bg-white py-2.5 text-sm font-medium text-emerald-800"
-                    >
-                      Otključaj
-                    </button>
-                  ) : null
-                ) : (
-                  <button
-                    type="button"
-                    disabled={draft.confirming || draft.saving}
-                    onClick={() => confirmWorker(worker.id)}
-                    className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white disabled:opacity-60"
-                  >
-                    {draft.confirming ? "Potvrđujem..." : "Potvrdio"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled={draft.confirming || draft.saving}
+                  onClick={() => confirmWorker(worker.id)}
+                  className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white disabled:opacity-60"
+                >
+                  {draft.confirming ? "Potvrđujem..." : "Potvrdio"}
+                </button>
               </div>
             )}
           </section>

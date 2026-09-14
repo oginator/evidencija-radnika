@@ -152,9 +152,16 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: true, hoursConfirmed: false });
   }
 
-  if (existing?.hoursConfirmed && !owner) {
+  if (owner) {
     return NextResponse.json(
-      { error: "Sati su potvrđeni. Samo vlasnik može da ih menja." },
+      { error: "Vlasnik ne menja sate. Otključajte radnika da operater može da ispravi unos." },
+      { status: 403 },
+    );
+  }
+
+  if (existing?.hoursConfirmed) {
+    return NextResponse.json(
+      { error: "Sati su potvrđeni. Vlasnik mora da ih otključa." },
       { status: 403 },
     );
   }
@@ -181,12 +188,6 @@ export async function PUT(request: Request) {
   }
 
   if (hasHours && hoursWorked === 0 && hoursConfirmed !== true) {
-    if (existing?.hoursConfirmed && !owner) {
-      return NextResponse.json(
-        { error: "Sati su potvrđeni. Samo vlasnik može da ih menja." },
-        { status: 403 },
-      );
-    }
     await prisma.dailyEntry.deleteMany({ where: { workerId, date } });
     return NextResponse.json({ ok: true, deleted: true });
   }
