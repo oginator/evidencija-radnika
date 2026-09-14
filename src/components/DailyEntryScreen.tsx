@@ -11,7 +11,7 @@ import {
   shiftDate,
   todayISO,
 } from "@/lib/period";
-import { formatHours, formatPoints, formatRsd } from "@/lib/format";
+import { formatHours, formatPoints, formatRsd, pointsTextClass } from "@/lib/format";
 
 type Furniture = { id: string; name: string; pointsPerPiece?: number };
 type Worker = { id: string; name: string };
@@ -297,7 +297,11 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                 <span className="min-w-0 break-words">
                   {furnitureName(line.furnitureTypeId)} × {line.quantity}
                   {owner ? (
-                    <span className="text-muted">
+                    <span
+                      className={pointsTextClass(
+                        line.quantity * furniturePoints(line.furnitureTypeId),
+                      )}
+                    >
                       {" "}
                       ({formatPoints(line.quantity * furniturePoints(line.furnitureTypeId))} bod)
                     </span>

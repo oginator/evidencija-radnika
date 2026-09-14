@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PageHeader } from "./PageHeader";
+import { pointsTextClass } from "@/lib/format";
 
 type Item = {
   id: string;
@@ -12,12 +13,6 @@ type Item = {
 };
 
 type Draft = { name: string; points: string };
-
-function pointsTextClass(value: string) {
-  const points = Number(value);
-  if (!Number.isFinite(points) || points === 0) return "text-foreground";
-  return points > 0 ? "font-semibold text-emerald-700" : "font-semibold text-red-700";
-}
 
 export function FurnitureScreen({ owner }: { owner: boolean }) {
   const [items, setItems] = useState<Item[]>([]);
