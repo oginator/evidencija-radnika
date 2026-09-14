@@ -84,6 +84,8 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   const [addPick, setAddPick] = useState({ typeId: "", qty: "1" });
   const [absentPromptId, setAbsentPromptId] = useState<string | null>(null);
   const [absentWait, setAbsentWait] = useState(3);
+  const [absentOverlayReady, setAbsentOverlayReady] = useState(false);
+  const absentArmedRef = useRef(false);
 
   const collectiveSavedRef = useRef(true);
   const requestId = useRef(0);
@@ -194,17 +196,38 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
 
   useEffect(() => {
     if (!absentPromptId) {
+      absentArmedRef.current = false;
       setAbsentWait(3);
+      setAbsentOverlayReady(false);
       return;
     }
+    absentArmedRef.current = false;
     setAbsentWait(3);
-    const ticks = [
-      window.setTimeout(() => setAbsentWait(2), 1000),
-      window.setTimeout(() => setAbsentWait(1), 2000),
-      window.setTimeout(() => setAbsentWait(0), 3000),
-    ];
-    return () => ticks.forEach((id) => window.clearTimeout(id));
+    setAbsentOverlayReady(false);
+    const started = Date.now();
+    const overlayTimer = window.setTimeout(() => setAbsentOverlayReady(true), 450);
+    const tick = window.setInterval(() => {
+      const left = Math.max(0, 3 - Math.floor((Date.now() - started) / 1000));
+      setAbsentWait(left);
+      if (left === 0) {
+        absentArmedRef.current = true;
+        window.clearInterval(tick);
+      }
+    }, 100);
+    return () => {
+      window.clearTimeout(overlayTimer);
+      window.clearInterval(tick);
+    };
   }, [absentPromptId]);
+
+  function openAbsentPrompt(workerId: string) {
+    window.setTimeout(() => {
+      absentArmedRef.current = false;
+      setAbsentWait(3);
+      setAbsentOverlayReady(false);
+      setAbsentPromptId(workerId);
+    }, 0);
+  }
 
   async function saveWorker(workerId: string, draft = drafts[workerId]) {
     if (!draft || owner || isLocked(draft)) return;
@@ -282,6 +305,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   }
 
   async function markAbsent(workerId: string) {
+    if (!absentArmedRef.current) return false;
     const draft = drafts[workerId];
     if (!draft || owner || isLocked(draft)) return false;
     setError("");
@@ -641,7 +665,11 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => setAbsentPromptId(worker.id)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openAbsentPrompt(worker.id);
+                    }}
                     className="rounded-full border border-red-500 bg-transparent px-2 py-0.5 text-[10px] font-medium leading-none text-red-600 disabled:opacity-60"
                   >
                     {draft.markingAbsent ? "..." : "Nije radio"}
@@ -745,12 +773,17 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
       })}
       {absentPromptId
         ? createPortal(
-            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+            <div
+              className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 ${
+                absentOverlayReady ? "" : "pointer-events-none"
+              }`}
+            >
               <div
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="absent-prompt-title"
                 className="w-full max-w-sm rounded-3xl border border-line bg-card p-5 shadow-lg"
+                onClick={(event) => event.stopPropagation()}
               >
                 <p id="absent-prompt-title" className="text-lg font-semibold">
                   Da li si siguran?
@@ -763,8 +796,11 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                 <div className="mt-5 grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    disabled={drafts[absentPromptId]?.markingAbsent}
-                    onClick={() => setAbsentPromptId(null)}
+                    disabled={!absentOverlayReady || drafts[absentPromptId]?.markingAbsent}
+                    onClick={() => {
+                      absentArmedRef.current = false;
+                      setAbsentPromptId(null);
+                    }}
                     className="rounded-xl border border-line bg-white py-2.5 text-sm font-medium disabled:opacity-60"
                   >
                     Ne
@@ -772,13 +808,22 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                   <button
                     type="button"
                     disabled={
-                      absentWait > 0 || drafts[absentPromptId]?.markingAbsent
+                      !absentArmedRef.current ||
+                      absentWait > 0 ||
+                      drafts[absentPromptId]?.markingAbsent
                     }
-                    onClick={async () => {
+                    onClick={async (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (!absentArmedRef.current || absentWait > 0) return;
                       const ok = await markAbsent(absentPromptId);
                       if (ok) setAbsentPromptId(null);
                     }}
-                    className="rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+                    className={`rounded-xl py-2.5 text-sm font-medium text-white ${
+                      absentWait > 0
+                        ? "pointer-events-none bg-red-600/40"
+                        : "bg-red-600 disabled:opacity-40"
+                    }`}
                   >
                     {drafts[absentPromptId]?.markingAbsent
                       ? "Čuvam..."
