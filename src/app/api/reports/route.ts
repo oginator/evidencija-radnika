@@ -49,9 +49,12 @@ export async function GET(request: Request) {
     bounds.from = isoDate(year, month, 1);
     bounds.to = defaultRangeTo(year, month, today);
   }
+  if (period === "day" && !bounds.date) {
+    bounds.date = defaultRangeTo(year, month, today);
+  }
 
   const rangePeriod =
-    rawPeriod === "day" || rawPeriod === "first" || rawPeriod === "second"
+    rawPeriod === "first" || rawPeriod === "second"
       ? rawPeriod
       : period;
   const range = periodRange(year, month, rangePeriod, bounds);

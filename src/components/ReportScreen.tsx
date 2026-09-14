@@ -79,7 +79,11 @@ function initialRange(searchParams: URLSearchParams, today: string) {
   const rawPeriod = searchParams.get("period");
   const year = Number(searchParams.get("year") || today.slice(0, 4));
   const month = Number(searchParams.get("month") || today.slice(5, 7));
-  if (rawPeriod === "day" || rawPeriod === "first" || rawPeriod === "second") {
+  if (rawPeriod === "day") {
+    const date = searchParams.get("date") || defaultRangeFor(year, month, today).to;
+    return periodRange(year, month, "day", { date });
+  }
+  if (rawPeriod === "first" || rawPeriod === "second") {
     return periodRange(year, month, rawPeriod, {
       date: searchParams.get("date") || undefined,
     });
@@ -100,6 +104,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
   );
   const [fromDate, setFromDate] = useState(start.from);
   const [toDate, setToDate] = useState(start.to);
+  const [dayDate, setDayDate] = useState(start.from);
   const [year, setYear] = useState(
     Number(searchParams.get("year") || toDate.slice(0, 4)),
   );
@@ -116,6 +121,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
     const next = defaultRangeFor(nextYear, nextMonth, today);
     setFromDate(next.from);
     setToDate(next.to);
+    setDayDate(next.to);
   }
 
   function applyFrom(value: string) {
@@ -131,6 +137,13 @@ export function ReportScreen({ owner }: { owner: boolean }) {
     setMonth(next.month);
   }
 
+  function applyDay(value: string) {
+    setDayDate(value);
+    const next = parseYearMonth(value);
+    setYear(next.year);
+    setMonth(next.month);
+  }
+
   const load = useCallback(async () => {
     const params = new URLSearchParams({
       year: String(year),
@@ -141,12 +154,15 @@ export function ReportScreen({ owner }: { owner: boolean }) {
       params.set("from", fromDate);
       params.set("to", toDate);
     }
+    if (period === "day") {
+      params.set("date", dayDate);
+    }
     const response = await fetch(`/api/reports?${params}`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Greška");
     setReport(data);
     setError("");
-  }, [year, month, period, fromDate, toDate]);
+  }, [year, month, period, fromDate, toDate, dayDate]);
 
   useEffect(() => {
     load().catch((err: Error) => setError(err.message));
@@ -165,12 +181,13 @@ export function ReportScreen({ owner }: { owner: boolean }) {
 
   const monthEndHighlight =
     period === "month" || (period === "range" && isLastDayOfMonth(toDate));
+  const showMonthHours = period !== "day";
 
   return (
     <div className="min-w-0 space-y-4">
       <PageHeader
         title="Izveštaj"
-        description="Pregled od datuma do datuma ili ceo mesec."
+        description="Pregled za jedan dan, period ili ceo mesec."
       />
 
       <div className="grid grid-cols-2 gap-2">
@@ -198,6 +215,22 @@ export function ReportScreen({ owner }: { owner: boolean }) {
               </option>
             ))}
         </select>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setPeriod("day");
+            setDayDate(toDate);
+          }}
+          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
+            period === "day"
+              ? "bg-brand text-white shadow-sm shadow-brand/30"
+              : "border border-line bg-card hover:border-brand/40"
+          }`}
+        >
+          Dan
+        </button>
         <button
           type="button"
           onClick={() => setPeriod("range")}
@@ -245,6 +278,20 @@ export function ReportScreen({ owner }: { owner: boolean }) {
         </div>
       ) : null}
 
+      {period === "day" ? (
+        <div className="rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
+          <label className="min-w-0 space-y-1 text-sm">
+            <span className="text-muted">Datum</span>
+            <input
+              type="date"
+              value={dayDate}
+              onChange={(e) => applyDay(e.target.value)}
+              className="mt-1 w-full min-w-0 rounded-lg border border-line bg-white px-2 py-2 text-base"
+            />
+          </label>
+        </div>
+      ) : null}
+
       {error ? <p className="text-sm text-accent">{error}</p> : null}
 
       {report ? (
@@ -285,8 +332,9 @@ export function ReportScreen({ owner }: { owner: boolean }) {
           <div className="rounded-3xl border border-line bg-card p-4 text-sm shadow-sm shadow-slate-900/5">
             <p className="font-medium capitalize">{report.label}</p>
             <p className="mt-1 text-muted">
-              Norma: {formatHours(report.workdayHours)}h × {report.weekdayCount}{" "}
-              radnih dana = {formatHours(report.expectedHours)}h
+              {period === "day"
+                ? `Norma: ${formatHours(report.workdayHours)}h`
+                : `Norma: ${formatHours(report.workdayHours)}h × ${report.weekdayCount} radnih dana = ${formatHours(report.expectedHours)}h`}
             </p>
           </div>
           <div className="table-scroll rounded-3xl border border-line bg-card shadow-sm shadow-slate-900/5">
@@ -295,11 +343,13 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                 <tr>
                   <th className="px-3 py-2 font-medium">Radnik</th>
                   <th className="px-3 py-2 font-medium">Sati</th>
-                  <th
-                    className={`px-3 py-2 font-medium ${monthEndHighlight ? "text-red-700" : ""}`}
-                  >
-                    Sati meseca
-                  </th>
+                  {showMonthHours ? (
+                    <th
+                      className={`px-3 py-2 font-medium ${monthEndHighlight ? "text-red-700" : ""}`}
+                    >
+                      Sati meseca
+                    </th>
+                  ) : null}
                   <th className="px-3 py-2 font-medium">% norme</th>
                   {owner ? (
                     <th className="px-3 py-2 font-medium">Stimulacija</th>
@@ -314,15 +364,17 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                       {row.active ? "" : " (neaktivan)"}
                     </td>
                     <td className="px-3 py-2">{formatHours(row.hours)}</td>
-                    <td
-                      className={`px-3 py-2 font-semibold ${
-                        monthEndHighlight ? "text-red-700" : ""
-                      }`}
-                    >
-                      {monthEndHighlight
-                        ? `${formatHours(row.monthHours)}h ukupno`
-                        : `${formatHours(row.monthHours)}h`}
-                    </td>
+                    {showMonthHours ? (
+                      <td
+                        className={`px-3 py-2 font-semibold ${
+                          monthEndHighlight ? "text-red-700" : ""
+                        }`}
+                      >
+                        {monthEndHighlight
+                          ? `${formatHours(row.monthHours)}h ukupno`
+                          : `${formatHours(row.monthHours)}h`}
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2">{formatPercent(row.hoursPercent)}</td>
                     {owner ? (
                       <td className="px-3 py-2 font-semibold text-brand">
@@ -337,9 +389,11 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                   <tr className="border-t border-line bg-background font-medium">
                     <td className="px-3 py-2">Ukupno sati</td>
                     <td className="px-3 py-2">{formatHours(sums.hours)}</td>
-                    <td className={monthEndHighlight ? "px-3 py-2 text-red-700" : "px-3 py-2"}>
-                      {formatHours(sums.monthHours)}h
-                    </td>
+                    {showMonthHours ? (
+                      <td className={monthEndHighlight ? "px-3 py-2 text-red-700" : "px-3 py-2"}>
+                        {formatHours(sums.monthHours)}h
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2" />
                     {owner ? (
                       <td className="px-3 py-2 text-brand">
@@ -349,7 +403,10 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                   </tr>
                   <tr className="border-t border-line bg-background">
                     <td className="px-3 py-2 font-medium">Nameštaj</td>
-                    <td className="px-3 py-2 font-medium" colSpan={owner ? 2 : 1}>
+                    <td
+                      className="px-3 py-2 font-medium"
+                      colSpan={owner && showMonthHours ? 2 : 1}
+                    >
                       {formatPoints(report.collective.furnitureQuantity)} kom
                     </td>
                     <td className="px-3 py-2" colSpan={owner ? 2 : 1}>
@@ -371,11 +428,11 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                             {formatPoints(item.quantity)} kom
                           </td>
                           {owner ? (
-                            <td className="px-3 py-2 text-muted" colSpan={3}>
+                            <td className="px-3 py-2 text-muted" colSpan={showMonthHours ? 3 : 2}>
                               {formatPoints(item.points ?? 0)} bod
                             </td>
                           ) : (
-                            <td className="px-3 py-2" colSpan={2} />
+                            <td className="px-3 py-2" colSpan={showMonthHours ? 2 : 1} />
                           )}
                         </tr>
                       ))

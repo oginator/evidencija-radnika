@@ -1,8 +1,8 @@
 import { eachDayOfInterval, getDay, lastDayOfMonth } from "date-fns";
 
-export type PeriodKey = "range" | "month";
+export type PeriodKey = "range" | "month" | "day";
 
-export const PERIOD_KEYS: PeriodKey[] = ["range", "month"];
+export const PERIOD_KEYS: PeriodKey[] = ["range", "month", "day"];
 
 export const BELGRADE_TZ = "Europe/Belgrade";
 export const MONTH_NAMES = [
@@ -48,7 +48,8 @@ export function isIsoDate(value?: string | null): value is string {
 }
 
 export function normalizePeriod(period?: string | null): PeriodKey {
-  return period === "month" ? "month" : "range";
+  if (period === "month" || period === "day") return period;
+  return "range";
 }
 
 export function periodRange(
@@ -67,8 +68,13 @@ export function periodRange(
   if (period === "second") {
     return { from: isoDate(year, month, 16), to: isoDate(year, month, last) };
   }
-  if (period === "day" && isIsoDate(bounds?.date)) {
-    return { from: bounds.date, to: bounds.date };
+  if (period === "day") {
+    const date = isIsoDate(bounds?.date)
+      ? bounds.date
+      : isIsoDate(bounds?.from)
+        ? bounds.from
+        : isoDate(year, month, 1);
+    return { from: date, to: date };
   }
   let from = isIsoDate(bounds?.from)
     ? bounds.from
@@ -99,7 +105,7 @@ export function periodLabel(
   if (period === "month") {
     return `${monthName} ${year}.`;
   }
-  if (from === to) {
+  if (period === "day" || from === to) {
     return formatDisplayDate(from);
   }
   return `${formatDisplayDate(from)} – ${formatDisplayDate(to)}`;
