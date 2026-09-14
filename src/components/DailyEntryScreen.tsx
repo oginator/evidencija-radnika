@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
   formatDisplayDate,
@@ -81,6 +82,8 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [addPick, setAddPick] = useState({ typeId: "", qty: "1" });
+  const [absentPromptId, setAbsentPromptId] = useState<string | null>(null);
+  const [absentWait, setAbsentWait] = useState(3);
 
   const collectiveSavedRef = useRef(true);
   const requestId = useRef(0);
@@ -189,6 +192,20 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
 
   useAutoRefresh(() => load(date, true));
 
+  useEffect(() => {
+    if (!absentPromptId) {
+      setAbsentWait(3);
+      return;
+    }
+    setAbsentWait(3);
+    const ticks = [
+      window.setTimeout(() => setAbsentWait(2), 1000),
+      window.setTimeout(() => setAbsentWait(1), 2000),
+      window.setTimeout(() => setAbsentWait(0), 3000),
+    ];
+    return () => ticks.forEach((id) => window.clearTimeout(id));
+  }, [absentPromptId]);
+
   async function saveWorker(workerId: string, draft = drafts[workerId]) {
     if (!draft || owner || isLocked(draft)) return;
     setDrafts((current) => ({
@@ -266,7 +283,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
 
   async function markAbsent(workerId: string) {
     const draft = drafts[workerId];
-    if (!draft || owner || isLocked(draft)) return;
+    if (!draft || owner || isLocked(draft)) return false;
     setError("");
     setDrafts((current) => ({
       ...current,
@@ -284,7 +301,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         ...current,
         [workerId]: { ...current[workerId], markingAbsent: false },
       }));
-      return;
+      return false;
     }
     setDrafts((current) => ({
       ...current,
@@ -299,6 +316,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         markingAbsent: false,
       },
     }));
+    return true;
   }
 
   async function unlockWorker(workerId: string) {
@@ -623,7 +641,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => markAbsent(worker.id)}
+                    onClick={() => setAbsentPromptId(worker.id)}
                     className="rounded-full border border-red-500 bg-transparent px-2 py-0.5 text-[10px] font-medium leading-none text-red-600 disabled:opacity-60"
                   >
                     {draft.markingAbsent ? "..." : "Nije radio"}
@@ -725,6 +743,55 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
           </section>
         );
       })}
+      {absentPromptId
+        ? createPortal(
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="absent-prompt-title"
+                className="w-full max-w-sm rounded-3xl border border-line bg-card p-5 shadow-lg"
+              >
+                <p id="absent-prompt-title" className="text-lg font-semibold">
+                  Da li si siguran?
+                </p>
+                <p className="mt-2 text-sm text-muted">
+                  {workers.find((item) => item.id === absentPromptId)?.name ??
+                    "Radnik"}{" "}
+                  nije radio ovog dana.
+                </p>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={drafts[absentPromptId]?.markingAbsent}
+                    onClick={() => setAbsentPromptId(null)}
+                    className="rounded-xl border border-line bg-white py-2.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    Ne
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      absentWait > 0 || drafts[absentPromptId]?.markingAbsent
+                    }
+                    onClick={async () => {
+                      const ok = await markAbsent(absentPromptId);
+                      if (ok) setAbsentPromptId(null);
+                    }}
+                    className="rounded-xl bg-red-600 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+                  >
+                    {drafts[absentPromptId]?.markingAbsent
+                      ? "Čuvam..."
+                      : absentWait > 0
+                        ? `Da (${absentWait})`
+                        : "Da"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
