@@ -25,7 +25,9 @@ type WorkerDraft = {
   didNotWork: boolean;
   confirming: boolean;
   markingAbsent: boolean;
+  unlocking: boolean;
 };
+type ConfirmAction = "absent" | "unlock";
 
 function ConfirmedMark() {
   return (
@@ -82,10 +84,13 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [addPick, setAddPick] = useState({ typeId: "", qty: "1" });
-  const [absentPromptId, setAbsentPromptId] = useState<string | null>(null);
-  const [absentWait, setAbsentWait] = useState(3);
-  const [absentOverlayReady, setAbsentOverlayReady] = useState(false);
-  const absentArmedRef = useRef(false);
+  const [confirmPrompt, setConfirmPrompt] = useState<{
+    workerId: string;
+    action: ConfirmAction;
+  } | null>(null);
+  const [confirmWait, setConfirmWait] = useState(3);
+  const [confirmOverlayReady, setConfirmOverlayReady] = useState(false);
+  const confirmArmedRef = useRef(false);
 
   const collectiveSavedRef = useRef(true);
   const requestId = useRef(0);
@@ -128,7 +133,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         const confirmed = !!entry?.hoursConfirmed;
         const didNotWork = !!entry?.didNotWork;
         const locked = confirmed || didNotWork;
-        if (existing?.confirming || existing?.markingAbsent) {
+        if (existing?.confirming || existing?.markingAbsent || existing?.unlocking) {
           next[worker.id] = existing;
         } else if (locked) {
           next[worker.id] = {
@@ -139,6 +144,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
             didNotWork,
             confirming: false,
             markingAbsent: false,
+            unlocking: false,
           };
         } else if (existing && (!existing.saved || existing.saving)) {
           next[worker.id] = {
@@ -155,6 +161,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
             didNotWork: false,
             confirming: false,
             markingAbsent: false,
+            unlocking: false,
           };
         }
       }
@@ -195,22 +202,22 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   useAutoRefresh(() => load(date, true));
 
   useEffect(() => {
-    if (!absentPromptId) {
-      absentArmedRef.current = false;
-      setAbsentWait(3);
-      setAbsentOverlayReady(false);
+    if (!confirmPrompt) {
+      confirmArmedRef.current = false;
+      setConfirmWait(3);
+      setConfirmOverlayReady(false);
       return;
     }
-    absentArmedRef.current = false;
-    setAbsentWait(3);
-    setAbsentOverlayReady(false);
+    confirmArmedRef.current = false;
+    setConfirmWait(3);
+    setConfirmOverlayReady(false);
     const started = Date.now();
-    const overlayTimer = window.setTimeout(() => setAbsentOverlayReady(true), 450);
+    const overlayTimer = window.setTimeout(() => setConfirmOverlayReady(true), 450);
     const tick = window.setInterval(() => {
       const left = Math.max(0, 3 - Math.floor((Date.now() - started) / 1000));
-      setAbsentWait(left);
+      setConfirmWait(left);
       if (left === 0) {
-        absentArmedRef.current = true;
+        confirmArmedRef.current = true;
         window.clearInterval(tick);
       }
     }, 100);
@@ -218,15 +225,20 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
       window.clearTimeout(overlayTimer);
       window.clearInterval(tick);
     };
-  }, [absentPromptId]);
+  }, [confirmPrompt]);
 
-  function openAbsentPrompt(workerId: string) {
+  function openConfirmPrompt(workerId: string, action: ConfirmAction) {
     window.setTimeout(() => {
-      absentArmedRef.current = false;
-      setAbsentWait(3);
-      setAbsentOverlayReady(false);
-      setAbsentPromptId(workerId);
+      confirmArmedRef.current = false;
+      setConfirmWait(3);
+      setConfirmOverlayReady(false);
+      setConfirmPrompt({ workerId, action });
     }, 0);
+  }
+
+  function closeConfirmPrompt() {
+    confirmArmedRef.current = false;
+    setConfirmPrompt(null);
   }
 
   async function saveWorker(workerId: string, draft = drafts[workerId]) {
@@ -300,12 +312,13 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         didNotWork: false,
         confirming: false,
         markingAbsent: false,
+        unlocking: false,
       },
     }));
   }
 
   async function markAbsent(workerId: string) {
-    if (!absentArmedRef.current) return false;
+    if (!confirmArmedRef.current) return false;
     const draft = drafts[workerId];
     if (!draft || owner || isLocked(draft)) return false;
     setError("");
@@ -338,14 +351,19 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         didNotWork: true,
         confirming: false,
         markingAbsent: false,
+        unlocking: false,
       },
     }));
     return true;
   }
 
   async function unlockWorker(workerId: string) {
-    if (!owner) return;
+    if (!confirmArmedRef.current || !owner) return false;
     setError("");
+    setDrafts((current) => ({
+      ...current,
+      [workerId]: { ...current[workerId], unlocking: true },
+    }));
     const response = await fetch("/api/entries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -354,7 +372,11 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       setError(data.error || "Otključavanje nije uspelo.");
-      return;
+      setDrafts((current) => ({
+        ...current,
+        [workerId]: { ...current[workerId], unlocking: false },
+      }));
+      return false;
     }
     setDrafts((current) => ({
       ...current,
@@ -362,8 +384,10 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         ...current[workerId],
         hoursConfirmed: false,
         didNotWork: false,
+        unlocking: false,
       },
     }));
+    return true;
   }
 
   async function saveCollective() {
@@ -640,7 +664,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         const absent = draft.didNotWork;
         const locked = confirmed || absent;
         const hoursReadOnly = owner || locked;
-        const busy = draft.saving || draft.confirming || draft.markingAbsent;
+        const busy = draft.saving || draft.confirming || draft.markingAbsent || draft.unlocking;
         return (
           <section
             key={worker.id}
@@ -668,7 +692,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      openAbsentPrompt(worker.id);
+                      openConfirmPrompt(worker.id, "absent");
                     }}
                     className="rounded-full border border-red-500 bg-transparent px-2 py-0.5 text-[10px] font-medium leading-none text-red-600 disabled:opacity-60"
                   >
@@ -738,7 +762,11 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
               locked ? (
                 <button
                   type="button"
-                  onClick={() => unlockWorker(worker.id)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openConfirmPrompt(worker.id, "unlock");
+                  }}
                   className={`mt-4 w-full rounded-xl border bg-white py-2.5 text-sm font-medium ${
                     absent
                       ? "border-red-300 text-red-800"
@@ -771,36 +799,37 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
           </section>
         );
       })}
-      {absentPromptId
+      {confirmPrompt
         ? createPortal(
             <div
               className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 ${
-                absentOverlayReady ? "" : "pointer-events-none"
+                confirmOverlayReady ? "" : "pointer-events-none"
               }`}
             >
               <div
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="absent-prompt-title"
+                aria-labelledby="confirm-prompt-title"
                 className="w-full max-w-sm rounded-3xl border border-line bg-card p-5 shadow-lg"
                 onClick={(event) => event.stopPropagation()}
               >
-                <p id="absent-prompt-title" className="text-lg font-semibold">
+                <p id="confirm-prompt-title" className="text-lg font-semibold">
                   Da li si siguran?
                 </p>
                 <p className="mt-2 text-sm text-muted">
-                  {workers.find((item) => item.id === absentPromptId)?.name ??
-                    "Radnik"}{" "}
-                  nije radio ovog dana.
+                  {confirmPrompt.action === "absent"
+                    ? `${workers.find((item) => item.id === confirmPrompt.workerId)?.name ?? "Radnik"} nije radio ovog dana.`
+                    : `Otključati ${workers.find((item) => item.id === confirmPrompt.workerId)?.name ?? "radnika"}?`}
                 </p>
                 <div className="mt-5 grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    disabled={!absentOverlayReady || drafts[absentPromptId]?.markingAbsent}
-                    onClick={() => {
-                      absentArmedRef.current = false;
-                      setAbsentPromptId(null);
-                    }}
+                    disabled={
+                      !confirmOverlayReady ||
+                      drafts[confirmPrompt.workerId]?.markingAbsent ||
+                      drafts[confirmPrompt.workerId]?.unlocking
+                    }
+                    onClick={closeConfirmPrompt}
                     className="rounded-xl border border-line bg-white py-2.5 text-sm font-medium disabled:opacity-60"
                   >
                     Ne
@@ -808,27 +837,32 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                   <button
                     type="button"
                     disabled={
-                      !absentArmedRef.current ||
-                      absentWait > 0 ||
-                      drafts[absentPromptId]?.markingAbsent
+                      !confirmArmedRef.current ||
+                      confirmWait > 0 ||
+                      drafts[confirmPrompt.workerId]?.markingAbsent ||
+                      drafts[confirmPrompt.workerId]?.unlocking
                     }
                     onClick={async (event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      if (!absentArmedRef.current || absentWait > 0) return;
-                      const ok = await markAbsent(absentPromptId);
-                      if (ok) setAbsentPromptId(null);
+                      if (!confirmArmedRef.current || confirmWait > 0) return;
+                      const ok =
+                        confirmPrompt.action === "absent"
+                          ? await markAbsent(confirmPrompt.workerId)
+                          : await unlockWorker(confirmPrompt.workerId);
+                      if (ok) closeConfirmPrompt();
                     }}
                     className={`rounded-xl py-2.5 text-sm font-medium text-white ${
-                      absentWait > 0
+                      confirmWait > 0
                         ? "pointer-events-none bg-red-600/40"
                         : "bg-red-600 disabled:opacity-40"
                     }`}
                   >
-                    {drafts[absentPromptId]?.markingAbsent
+                    {drafts[confirmPrompt.workerId]?.markingAbsent ||
+                    drafts[confirmPrompt.workerId]?.unlocking
                       ? "Čuvam..."
-                      : absentWait > 0
-                        ? `Da (${absentWait})`
+                      : confirmWait > 0
+                        ? `Da (${confirmWait})`
                         : "Da"}
                   </button>
                 </div>
