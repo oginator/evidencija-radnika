@@ -250,7 +250,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
       {report ? (
         <>
           <div className="rounded-3xl border border-brand/40 bg-card p-4 text-sm shadow-sm shadow-brand/10">
-            <p className="font-semibold">Kolektiv „ubaceno u kombi“</p>
+            <p className="font-semibold">Kolektiv</p>
             {owner ? (
               <>
                 <p className="mt-1 text-muted">

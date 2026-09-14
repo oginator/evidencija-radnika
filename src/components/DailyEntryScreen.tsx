@@ -269,9 +269,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         <section className="rounded-3xl border border-brand/40 bg-card p-4 shadow-sm shadow-brand/10">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">
-                Kolektiv „ubaceno u kombi“
-              </h2>
+              <h2 className="text-lg font-semibold">Kolektiv</h2>
               <p className="text-xs text-muted">
                 {owner
                   ? "Bodovi iz proizvoda važe za sve radnike zajedno."

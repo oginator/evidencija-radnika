@@ -13,6 +13,12 @@ type Item = {
 
 type Draft = { name: string; points: string };
 
+function pointsTextClass(value: string) {
+  const points = Number(value);
+  if (!Number.isFinite(points) || points === 0) return "text-foreground";
+  return points > 0 ? "font-semibold text-emerald-700" : "font-semibold text-red-700";
+}
+
 export function FurnitureScreen({ owner }: { owner: boolean }) {
   const [items, setItems] = useState<Item[]>([]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -166,7 +172,7 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
           value={points}
           onChange={(e) => setPoints(e.target.value)}
           placeholder="Bodovi"
-          className="rounded-xl border border-line bg-white px-3 py-3"
+          className={`rounded-xl border border-line bg-white px-3 py-3 ${pointsTextClass(points)}`}
           required
         />
         <button
@@ -222,7 +228,7 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
                         [item.id]: { ...draft, points: e.target.value },
                       }))
                     }
-                    className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-base font-normal text-foreground"
+                    className={`mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-base ${pointsTextClass(draft.points)}`}
                   />
                 </label>
                 ) : null}
