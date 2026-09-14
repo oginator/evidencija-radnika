@@ -114,7 +114,7 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <PageHeader
         title={owner ? "Nameštaj i bodovi" : "Nameštaj"}
         description={

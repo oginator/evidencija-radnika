@@ -19,14 +19,14 @@ export function BrandLogo({
     <img
       src="/lux-logo.jpg"
       alt="LUX ceramica"
-      className={`${height} w-auto max-w-full object-contain object-left`}
+      className={`${height} w-auto max-w-[7.5rem] object-contain object-left sm:max-w-none`}
     />
   );
 
   if (!plated) return image;
 
   return (
-    <div className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 shadow-lg shadow-slate-900/10">
+    <div className="inline-flex max-w-full items-center justify-center rounded-2xl bg-white px-4 py-2.5 shadow-lg shadow-slate-900/10 sm:px-5 sm:py-3">
       {image}
     </div>
   );

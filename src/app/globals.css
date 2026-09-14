@@ -26,12 +26,20 @@
 
 html {
   color-scheme: light;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-y;
   background:
-    radial-gradient(1200px 420px at 8% -10%, #d7f0fb 0%, transparent 55%),
-    radial-gradient(900px 360px at 100% 0%, #e8eef3 0%, transparent 50%),
+    radial-gradient(900px 280px at 8% -10%, #d7f0fb 0%, transparent 55%),
+    radial-gradient(700px 240px at 100% 0%, #e8eef3 0%, transparent 50%),
     var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
@@ -42,11 +50,13 @@ select,
 button,
 textarea {
   font: inherit;
+  max-width: 100%;
 }
 
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
+  font-size: 16px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -56,4 +66,11 @@ textarea:focus {
   outline: none;
   border-color: var(--brand);
   box-shadow: 0 0 0 3px rgb(10 142 200 / 16%);
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }

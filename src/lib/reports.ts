@@ -1,5 +1,13 @@
 import { prisma } from "./prisma";
-import { expectedHours, periodRange, type PeriodKey } from "./period";
+import {
+  expectedHours,
+  isoDate,
+  lastDayOfMonthNum,
+  periodRange,
+  weekdayCount as countMonthWeekdays,
+  weekdayCountInRange,
+  type PeriodKey,
+} from "./period";
 import { migrateCollectiveFromWorkers, summarizeCollective } from "./collective";
 
 export type AssemblyDetail = {
@@ -59,7 +67,7 @@ export async function buildReport(
   year: number,
   month: number,
   period: PeriodKey,
-  date?: string,
+  bounds?: { from?: string; to?: string; date?: string },
 ): Promise<{
   rows: ReportRow[];
   collective: CollectiveSummary;
@@ -71,16 +79,21 @@ export async function buildReport(
 }> {
   await migrateCollectiveFromWorkers();
   const settings = await getSettings();
-  const { from, to } = periodRange(year, month, period, date);
-  const monthFrom = `${year}-${String(month).padStart(2, "0")}-01`;
-  const monthTo = periodRange(year, month, "second").to;
+  const { from, to } = periodRange(year, month, period, bounds);
+  const monthFrom = isoDate(year, month, 1);
+  const monthTo = isoDate(year, month, lastDayOfMonthNum(year, month));
   const monthExpected = expectedHours(year, month, settings.workdayHours);
-  const expected = monthExpected;
-  const isDay = period === "day";
+  const weekdayCount =
+    period === "month"
+      ? countMonthWeekdays(year, month)
+      : weekdayCountInRange(from, to);
+  const expected = weekdayCount * settings.workdayHours;
+  const queryFrom = from < monthFrom ? from : monthFrom;
+  const queryTo = to > monthTo ? to : monthTo;
 
   const [entries, collectiveLines] = await Promise.all([
     prisma.dailyEntry.findMany({
-      where: { date: { gte: monthFrom, lte: monthTo } },
+      where: { date: { gte: queryFrom, lte: queryTo } },
       include: { worker: true },
     }),
     prisma.collectiveAssembly.findMany({
@@ -112,7 +125,9 @@ export async function buildReport(
       };
       byWorker.set(entry.workerId, row);
     }
-    row.monthHours += entry.hoursWorked;
+    if (entry.date >= monthFrom && entry.date <= monthTo) {
+      row.monthHours += entry.hoursWorked;
+    }
     if (entry.date >= from && entry.date <= to) {
       row.hours += entry.hoursWorked;
     }
@@ -141,8 +156,6 @@ export async function buildReport(
 
   const rows: ReportRow[] = [...byWorker.values()]
     .map((row) => {
-      const percentBase = isDay ? settings.workdayHours : expected;
-      const percentHours = isDay ? row.hours : row.monthHours;
       const bonus = workerCollectiveBonus(
         collective.stimulationRsd,
         workerCount,
@@ -151,8 +164,8 @@ export async function buildReport(
       );
       return {
         ...row,
-        expectedHours: isDay ? settings.workdayHours : expected,
-        hoursPercent: percentBase > 0 ? (percentHours / percentBase) * 100 : 0,
+        expectedHours: expected,
+        hoursPercent: expected > 0 ? (row.hours / expected) * 100 : 0,
         monthHoursPercent: bonus.monthHoursPercent,
         equalShareRsd: bonus.equalShareRsd,
         stimulationRsd: row.active ? bonus.stimulationRsd : 0,
@@ -177,8 +190,8 @@ export async function buildReport(
     },
     rsdPerPoint: settings.rsdPerPoint,
     workdayHours: settings.workdayHours,
-    expectedHours: isDay ? settings.workdayHours : expected,
-    weekdayCount: expected / settings.workdayHours,
+    expectedHours: expected,
+    weekdayCount,
     daysWithData: [
       ...new Set([
         ...entries.map((entry) => entry.date),

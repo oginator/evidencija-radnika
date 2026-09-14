@@ -93,7 +93,7 @@ export function WorkersScreen() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <PageHeader
         title="Radnici"
         description="Dodajte radnika, promenite ime ili ga izbrišite iz evidencije."

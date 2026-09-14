@@ -152,8 +152,8 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   const lastDay = lastDayOfMonthNum(year, month);
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
+    <div className="min-w-0 space-y-4">
+      <div className="space-y-3 rounded-3xl border border-line bg-card p-3 shadow-sm shadow-slate-900/5 sm:p-4">
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
@@ -176,7 +176,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`mt-1 rounded-lg border bg-white px-2 py-1 text-sm ${
+              className={`mt-1 max-w-full rounded-lg border bg-white px-2 py-1 text-base ${
                 viewingToday ? "border-brand" : "border-line"
               }`}
             />
@@ -256,9 +256,9 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
             {collective.map((line, index) => (
               <li
                 key={`${line.furnitureTypeId}-${index}`}
-                className="flex items-center justify-between rounded-xl bg-background px-3 py-2 text-sm"
+                className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-background px-3 py-2 text-sm"
               >
-                <span>
+                <span className="min-w-0 break-words">
                   {furnitureName(line.furnitureTypeId)} × {line.quantity}
                   {owner ? (
                     <span className="text-muted">
@@ -273,20 +273,20 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                     setCollective((current) => current.filter((_, i) => i !== index));
                     setCollectiveSaved(false);
                   }}
-                  className="text-accent"
+                  className="shrink-0 text-accent"
                 >
                   Ukloni
                 </button>
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
             <select
               value={addPick.typeId}
               onChange={(e) =>
                 setAddPick((current) => ({ ...current, typeId: e.target.value }))
               }
-              className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2"
+              className="min-w-0 w-full flex-1 rounded-xl border border-line bg-white px-3 py-2"
             >
               {furniture.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -304,7 +304,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
               onChange={(e) =>
                 setAddPick((current) => ({ ...current, qty: e.target.value }))
               }
-              className="w-20 rounded-xl border border-line bg-white px-2 py-2"
+              className="w-full rounded-xl border border-line bg-white px-2 py-2 sm:w-20"
             />
             <button
               type="button"
@@ -325,7 +325,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                 });
                 setCollectiveSaved(false);
               }}
-              className="rounded-xl bg-brand px-3 py-2 text-sm font-medium text-white"
+              className="rounded-xl bg-brand px-3 py-2 text-sm font-medium text-white sm:shrink-0"
             >
               Dodaj
             </button>

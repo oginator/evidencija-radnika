@@ -77,7 +77,7 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <form onSubmit={save} className="space-y-4">
         <PageHeader title="Podešavanja" />
         <label className="block rounded-3xl border border-line bg-card p-4 text-sm font-medium shadow-sm shadow-slate-900/5">

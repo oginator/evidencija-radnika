@@ -7,7 +7,9 @@ import {
   isLastDayOfMonth,
   lastDayOfMonthNum,
   MONTH_NAMES,
-  shiftDate,
+  normalizePeriod,
+  parseYearMonth,
+  periodRange,
   todayISO,
   type PeriodKey,
 } from "@/lib/period";
@@ -50,6 +52,8 @@ type Report = {
   period: PeriodKey;
   date: string;
   label: string;
+  from: string;
+  to: string;
   lastDay: number;
   rsdPerPoint?: number;
   workdayHours: number;
@@ -60,40 +64,71 @@ type Report = {
   collective: Collective;
 };
 
+function defaultRangeFor(year: number, month: number, today: string) {
+  const last = lastDayOfMonthNum(year, month);
+  const isCurrentMonth =
+    year === Number(today.slice(0, 4)) && month === Number(today.slice(5, 7));
+  return {
+    from: isoDate(year, month, 1),
+    to: isCurrentMonth ? today : isoDate(year, month, last),
+  };
+}
+
+function initialRange(searchParams: URLSearchParams, today: string) {
+  const rawPeriod = searchParams.get("period");
+  const year = Number(searchParams.get("year") || today.slice(0, 4));
+  const month = Number(searchParams.get("month") || today.slice(5, 7));
+  if (rawPeriod === "day" || rawPeriod === "first" || rawPeriod === "second") {
+    return periodRange(year, month, rawPeriod, {
+      date: searchParams.get("date") || undefined,
+    });
+  }
+  const fallback = defaultRangeFor(year, month, today);
+  return periodRange(year, month, "range", {
+    from: searchParams.get("from") || fallback.from,
+    to: searchParams.get("to") || fallback.to,
+  });
+}
+
 export function ReportScreen({ owner }: { owner: boolean }) {
   const searchParams = useSearchParams();
   const today = todayISO();
+  const start = initialRange(searchParams, today);
   const [period, setPeriod] = useState<PeriodKey>(
-    (searchParams.get("period") as PeriodKey) || "day",
+    normalizePeriod(searchParams.get("period")),
   );
-  const [date, setDate] = useState(searchParams.get("date") || today);
+  const [fromDate, setFromDate] = useState(start.from);
+  const [toDate, setToDate] = useState(start.to);
   const [year, setYear] = useState(
-    Number(searchParams.get("year") || date.slice(0, 4)),
+    Number(searchParams.get("year") || toDate.slice(0, 4)),
   );
   const [month, setMonth] = useState(
-    Number(searchParams.get("month") || date.slice(5, 7)),
+    Number(searchParams.get("month") || toDate.slice(5, 7)),
   );
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
   const [showFurniture, setShowFurniture] = useState(false);
 
-  useEffect(() => {
-    if (period !== "day") return;
-    const nextYear = Number(date.slice(0, 4));
-    const nextMonth = Number(date.slice(5, 7));
-    if (nextYear !== year) setYear(nextYear);
-    if (nextMonth !== month) setMonth(nextMonth);
-  }, [date, period, year, month]);
+  function applyMonthYear(nextYear: number, nextMonth: number) {
+    setYear(nextYear);
+    setMonth(nextMonth);
+    const next = defaultRangeFor(nextYear, nextMonth, today);
+    setFromDate(next.from);
+    setToDate(next.to);
+  }
 
-  useEffect(() => {
-    if (period !== "day") return;
-    const last = lastDayOfMonthNum(year, month);
-    const day = Number(date.slice(8));
-    const inMonth = date.slice(0, 7) === `${year}-${String(month).padStart(2, "0")}`;
-    if (!inMonth) {
-      setDate(isoDate(year, month, Math.min(day || 1, last)));
-    }
-  }, [year, month, period, date]);
+  function applyFrom(value: string) {
+    setFromDate(value);
+    if (value > toDate) setToDate(value);
+  }
+
+  function applyTo(value: string) {
+    setToDate(value);
+    if (value < fromDate) setFromDate(value);
+    const next = parseYearMonth(value);
+    setYear(next.year);
+    setMonth(next.month);
+  }
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -101,7 +136,10 @@ export function ReportScreen({ owner }: { owner: boolean }) {
       month: String(month),
       period,
     });
-    if (period === "day") params.set("date", date);
+    if (period === "range") {
+      params.set("from", fromDate);
+      params.set("to", toDate);
+    }
     fetch(`/api/reports?${params}`)
       .then(async (response) => {
         const data = await response.json();
@@ -111,7 +149,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
         setError("");
       })
       .catch((err: Error) => setError(err.message));
-  }, [year, month, period, date]);
+  }, [year, month, period, fromDate, toDate]);
 
   const sums = report?.rows.reduce(
     (acc, row) => ({
@@ -122,26 +160,20 @@ export function ReportScreen({ owner }: { owner: boolean }) {
     { hours: 0, monthHours: 0, stimulationRsd: 0 },
   );
 
-  const lastDay = lastDayOfMonthNum(year, month);
-  const selectedDay = Number(date.slice(8));
-  const daysWithData = new Set(report?.daysWithData ?? []);
-  const percentLabel = period === "day" ? "% smene" : "% norme";
   const monthEndHighlight =
-    period === "second" ||
-    period === "month" ||
-    (period === "day" && isLastDayOfMonth(date));
+    period === "month" || (period === "range" && isLastDayOfMonth(toDate));
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <PageHeader
         title="Izveštaj"
-        description="Dnevni pregled, 1–15., 16.–kraj ili ceo mesec."
+        description="Pregled od datuma do datuma ili ceo mesec."
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2">
         <select
           value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
+          onChange={(e) => applyMonthYear(year, Number(e.target.value))}
           className="rounded-2xl border border-line bg-card px-3 py-2.5 shadow-sm shadow-slate-900/5"
         >
           {MONTH_NAMES.map((name, index) => (
@@ -152,7 +184,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
         </select>
         <select
           value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
+          onChange={(e) => applyMonthYear(Number(e.target.value), month)}
           className="rounded-2xl border border-line bg-card px-3 py-2.5 shadow-sm shadow-slate-900/5"
         >
           {[year - 1, year, year + 1]
@@ -165,36 +197,14 @@ export function ReportScreen({ owner }: { owner: boolean }) {
         </select>
         <button
           type="button"
-          onClick={() => setPeriod("day")}
+          onClick={() => setPeriod("range")}
           className={`rounded-2xl px-3 py-2.5 text-sm transition ${
-            period === "day"
+            period === "range"
               ? "bg-brand text-white shadow-sm shadow-brand/30"
               : "border border-line bg-card hover:border-brand/40"
           }`}
         >
-          Dan
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod("first")}
-          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
-            period === "first"
-              ? "bg-brand text-white shadow-sm shadow-brand/30"
-              : "border border-line bg-card hover:border-brand/40"
-          }`}
-        >
-          1–15.
-        </button>
-        <button
-          type="button"
-          onClick={() => setPeriod("second")}
-          className={`rounded-2xl px-3 py-2.5 text-sm transition ${
-            period === "second"
-              ? "bg-brand text-white shadow-sm shadow-brand/30"
-              : "border border-line bg-card hover:border-brand/40"
-          }`}
-        >
-          16–kraj
+          Period
         </button>
         <button
           type="button"
@@ -209,58 +219,26 @@ export function ReportScreen({ owner }: { owner: boolean }) {
         </button>
       </div>
 
-      {period === "day" ? (
-        <div className="space-y-3 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setDate(shiftDate(date, -1))}
-              className="rounded-xl px-3 py-2 text-lg hover:bg-background"
-              aria-label="Prethodni dan"
-            >
-              ‹
-            </button>
+      {period === "range" ? (
+        <div className="grid grid-cols-2 gap-2 rounded-3xl border border-line bg-card p-4 shadow-sm shadow-slate-900/5">
+          <label className="min-w-0 space-y-1 text-sm">
+            <span className="text-muted">Od</span>
             <input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-line bg-white px-2 py-1 text-sm"
+              value={fromDate}
+              onChange={(e) => applyFrom(e.target.value)}
+              className="w-full min-w-0 rounded-lg border border-line bg-white px-2 py-2 text-base"
             />
-            <button
-              type="button"
-              onClick={() => setDate(shiftDate(date, 1))}
-              className="rounded-xl px-3 py-2 text-lg hover:bg-background"
-              aria-label="Sledeći dan"
-            >
-              ›
-            </button>
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: lastDay }, (_, index) => index + 1).map((day) => {
-              const iso = isoDate(year, month, day);
-              const active = period === "day" && selectedDay === day;
-              const hasData = daysWithData.has(iso);
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  onClick={() => {
-                    setPeriod("day");
-                    setDate(iso);
-                  }}
-                  className={`rounded-lg py-1.5 text-xs ${
-                    active
-                      ? "bg-brand text-white"
-                      : hasData
-                        ? "bg-background font-medium text-brand"
-                        : "text-muted hover:bg-background"
-                  }`}
-                >
-                  {day}
-                </button>
-              );
-            })}
-          </div>
+          </label>
+          <label className="min-w-0 space-y-1 text-sm">
+            <span className="text-muted">Do</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => applyTo(e.target.value)}
+              className="w-full min-w-0 rounded-lg border border-line bg-white px-2 py-2 text-base"
+            />
+          </label>
         </div>
       ) : null}
 
@@ -304,12 +282,11 @@ export function ReportScreen({ owner }: { owner: boolean }) {
           <div className="rounded-3xl border border-line bg-card p-4 text-sm shadow-sm shadow-slate-900/5">
             <p className="font-medium capitalize">{report.label}</p>
             <p className="mt-1 text-muted">
-              {period === "day"
-                ? `Norma smene: ${formatHours(report.workdayHours)}h`
-                : `Norma: ${formatHours(report.workdayHours)}h × ${report.weekdayCount} radnih dana = ${formatHours(report.expectedHours)}h`}
+              Norma: {formatHours(report.workdayHours)}h × {report.weekdayCount}{" "}
+              radnih dana = {formatHours(report.expectedHours)}h
             </p>
           </div>
-          <div className="overflow-x-auto rounded-3xl border border-line bg-card shadow-sm shadow-slate-900/5">
+          <div className="table-scroll rounded-3xl border border-line bg-card shadow-sm shadow-slate-900/5">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-background text-xs text-muted">
                 <tr>
@@ -320,10 +297,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                   >
                     Sati meseca
                   </th>
-                  <th className="px-3 py-2 font-medium">{percentLabel}</th>
-                  {period === "day" ? (
-                    <th className="px-3 py-2 font-medium">% meseca</th>
-                  ) : null}
+                  <th className="px-3 py-2 font-medium">% norme</th>
                   {owner ? (
                     <th className="px-3 py-2 font-medium">Stimulacija</th>
                   ) : null}
@@ -347,11 +321,6 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                         : `${formatHours(row.monthHours)}h`}
                     </td>
                     <td className="px-3 py-2">{formatPercent(row.hoursPercent)}</td>
-                    {period === "day" ? (
-                      <td className="px-3 py-2">
-                        {formatPercent(row.monthHoursPercent)}
-                      </td>
-                    ) : null}
                     {owner ? (
                       <td className="px-3 py-2 font-semibold text-brand">
                         {formatRsd(row.stimulationRsd ?? 0)}
@@ -369,7 +338,6 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                       {formatHours(sums.monthHours)}h
                     </td>
                     <td className="px-3 py-2" />
-                    {period === "day" ? <td className="px-3 py-2" /> : null}
                     {owner ? (
                       <td className="px-3 py-2 text-brand">
                         {formatRsd(sums.stimulationRsd)}
@@ -378,10 +346,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                   </tr>
                   <tr className="border-t border-line bg-background">
                     <td className="px-3 py-2 font-medium">Nameštaj</td>
-                    <td
-                      className="px-3 py-2 font-medium"
-                      colSpan={period === "day" ? (owner ? 3 : 2) : owner ? 2 : 1}
-                    >
+                    <td className="px-3 py-2 font-medium" colSpan={owner ? 2 : 1}>
                       {formatPoints(report.collective.furnitureQuantity)} kom
                     </td>
                     <td className="px-3 py-2" colSpan={owner ? 2 : 1}>
@@ -403,14 +368,11 @@ export function ReportScreen({ owner }: { owner: boolean }) {
                             {formatPoints(item.quantity)} kom
                           </td>
                           {owner ? (
-                            <td
-                              className="px-3 py-2 text-muted"
-                              colSpan={period === "day" ? 4 : 3}
-                            >
+                            <td className="px-3 py-2 text-muted" colSpan={3}>
                               {formatPoints(item.points ?? 0)} bod
                             </td>
                           ) : (
-                            <td className="px-3 py-2" colSpan={period === "day" ? 3 : 2} />
+                            <td className="px-3 py-2" colSpan={2} />
                           )}
                         </tr>
                       ))

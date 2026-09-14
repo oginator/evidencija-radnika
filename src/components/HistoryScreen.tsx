@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { MONTH_NAMES } from "@/lib/period";
+import { isoDate, lastDayOfMonthNum, MONTH_NAMES } from "@/lib/period";
 import {
   formatHours,
   formatPercent,
@@ -41,10 +41,10 @@ export function HistoryScreen() {
   const maxPoints = Math.max(1, ...months.map((m) => m.totalPoints));
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <PageHeader
         title="Istorija po mesecima"
-        description="Klik na mesec otvara oba perioda (1–15. i 16.–kraj)."
+        description="Klik na mesec otvara izveštaj za ceo mesec ili izabrani period."
       />
       {error ? <p className="text-sm text-accent">{error}</p> : null}
       {!loaded ? (
@@ -87,22 +87,10 @@ export function HistoryScreen() {
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link
-                href={`/izvestaj?year=${row.year}&month=${row.month}&period=day&date=${row.year}-${String(row.month).padStart(2, "0")}-01`}
+                href={`/izvestaj?year=${row.year}&month=${row.month}&period=range&from=${isoDate(row.year, row.month, 1)}&to=${isoDate(row.year, row.month, lastDayOfMonthNum(row.year, row.month))}`}
                 className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
               >
-                Dani
-              </Link>
-              <Link
-                href={`/izvestaj?year=${row.year}&month=${row.month}&period=first`}
-                className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
-              >
-                1–15.
-              </Link>
-              <Link
-                href={`/izvestaj?year=${row.year}&month=${row.month}&period=second`}
-                className="rounded-full bg-background px-3 py-1.5 text-sm text-brand transition hover:bg-sky-50"
-              >
-                16–kraj
+                Period
               </Link>
               <Link
                 href={`/izvestaj?year=${row.year}&month=${row.month}&period=month`}

@@ -32,11 +32,13 @@ export function AppShell({
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-5xl flex-col">
-      <header className="sticky top-0 z-20 border-b border-line/70 bg-white/90 px-4 py-3 shadow-sm shadow-slate-900/5 backdrop-blur-md relative">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <BrandLogo size="sm" />
+    <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-5xl flex-col overflow-hidden">
+      <header className="relative shrink-0 border-b border-line/70 bg-white/95 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] shadow-sm shadow-slate-900/5 backdrop-blur-md sm:px-4 sm:py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="shrink-0">
+              <BrandLogo size="sm" />
+            </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold tracking-tight text-foreground">
                 Evidencija radnika
@@ -49,7 +51,7 @@ export function AppShell({
           <button
             type="button"
             onClick={logout}
-            className="rounded-full border border-line px-3 py-1.5 text-sm text-muted transition hover:border-brand hover:text-brand"
+            className="shrink-0 rounded-full border border-line px-3 py-1.5 text-sm text-muted transition hover:border-brand hover:text-brand"
           >
             Odjava
           </button>
@@ -77,10 +79,12 @@ export function AppShell({
         </nav>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-linear-to-r from-[#066a96] via-[#0a8ec8] to-[#7dcef0]" />
       </header>
-      <main className="flex-1 px-4 py-5 pb-24 sm:pb-8">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 backdrop-blur-md sm:hidden">
+      <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-4 sm:py-5">
+        {children}
+      </main>
+      <nav className="shrink-0 border-t border-line bg-white/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:hidden">
         <div
-          className={`mx-auto grid max-w-5xl gap-1 px-2 py-2 ${
+          className={`mx-auto grid max-w-5xl gap-1 px-2 pt-2 ${
             user.role === "owner" ? "grid-cols-3" : "grid-cols-4"
           }`}
         >
@@ -93,7 +97,7 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-xl px-2 py-2 text-center text-xs font-medium transition ${
+                className={`rounded-xl px-1 py-2 text-center text-[11px] font-medium transition ${
                   active ? "bg-brand text-white" : "text-muted"
                 }`}
               >

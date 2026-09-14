@@ -33,7 +33,7 @@ export function LoginForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full rounded-3xl border border-line/80 bg-white p-7 shadow-xl shadow-slate-900/10"
+      className="w-full max-w-full rounded-3xl border border-line/80 bg-white p-5 shadow-xl shadow-slate-900/10 sm:p-7"
     >
       <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground">
         Evidencija radnika
