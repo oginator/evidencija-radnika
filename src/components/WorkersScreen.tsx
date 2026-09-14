@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PageHeader } from "./PageHeader";
 
 type Worker = { id: string; name: string; active: boolean };
@@ -14,24 +15,39 @@ export function WorkersScreen() {
   const [pending, setPending] = useState(false);
   const [savingId, setSavingId] = useState("");
 
-  async function load() {
-    const response = await fetch("/api/workers");
+  const workersRef = useRef<Worker[]>([]);
+  workersRef.current = workers;
+
+  const load = useCallback(async (silent = false) => {
+    const response = await fetch("/api/workers", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) {
-      setError(data.error || "Učitavanje nije uspelo.");
+      if (!silent) setError(data.error || "Učitavanje nije uspelo.");
       return;
     }
-    setWorkers(data.workers);
-    const next: Record<string, string> = {};
-    for (const worker of data.workers as Worker[]) {
-      next[worker.id] = worker.name;
-    }
-    setDrafts(next);
-  }
+    const nextWorkers = data.workers as Worker[];
+    setWorkers(nextWorkers);
+    setDrafts((current) => {
+      const next: Record<string, string> = {};
+      for (const worker of nextWorkers) {
+        const previousName = workersRef.current.find((item) => item.id === worker.id)
+          ?.name;
+        const prevDraft = current[worker.id];
+        const dirty =
+          prevDraft !== undefined &&
+          previousName !== undefined &&
+          prevDraft !== previousName;
+        next[worker.id] = dirty ? prevDraft : worker.name;
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
+
+  useAutoRefresh(() => load(true));
 
   async function addWorker(event: React.FormEvent) {
     event.preventDefault();

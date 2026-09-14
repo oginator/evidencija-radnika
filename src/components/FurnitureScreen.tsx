@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PageHeader } from "./PageHeader";
 
 type Item = {
@@ -22,27 +23,51 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
   const [pending, setPending] = useState(false);
   const [savingId, setSavingId] = useState("");
 
-  async function load() {
-    const response = await fetch("/api/furniture");
+  const itemsRef = useRef<Item[]>([]);
+  itemsRef.current = items;
+
+  const load = useCallback(async (silent = false) => {
+    const response = await fetch("/api/furniture", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) {
-      setError(data.error || "Učitavanje nije uspelo.");
+      if (!silent) setError(data.error || "Učitavanje nije uspelo.");
       return;
     }
-    setItems(data.furniture);
-    const next: Record<string, Draft> = {};
-    for (const item of data.furniture as Item[]) {
-      next[item.id] = {
-        name: item.name,
-        points: item.pointsPerPiece === undefined ? "" : String(item.pointsPerPiece),
-      };
-    }
-    setDrafts(next);
-  }
+    const nextItems = data.furniture as Item[];
+    setItems(nextItems);
+    setDrafts((current) => {
+      const next: Record<string, Draft> = {};
+      for (const item of nextItems) {
+        const previous = itemsRef.current.find((row) => row.id === item.id);
+        const prevDraft = current[item.id];
+        const dirty = owner
+          ? prevDraft !== undefined &&
+            previous !== undefined &&
+            (prevDraft.name !== previous.name ||
+              prevDraft.points !==
+                (previous.pointsPerPiece === undefined
+                  ? ""
+                  : String(previous.pointsPerPiece)))
+          : prevDraft !== undefined &&
+            previous !== undefined &&
+            prevDraft.name !== previous.name;
+        next[item.id] = dirty
+          ? prevDraft
+          : {
+              name: item.name,
+              points:
+                item.pointsPerPiece === undefined ? "" : String(item.pointsPerPiece),
+            };
+      }
+      return next;
+    });
+  }, [owner]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
+
+  useAutoRefresh(() => load(true));
 
   async function addItem(event: React.FormEvent) {
     event.preventDefault();
@@ -73,7 +98,7 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
       setError("Naziv ne može biti prazan.");
       return;
     }
-    if (owner && (!Number.isFinite(pointsPerPiece) || pointsPerPiece < 0)) {
+    if (owner && !Number.isFinite(pointsPerPiece)) {
       setError("Unesite ispravne bodove.");
       return;
     }
@@ -119,7 +144,7 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
         title={owner ? "Nameštaj i bodovi" : "Nameštaj"}
         description={
           owner
-            ? "Ovde dodajete komade i menjate naziv ili koliko bodova donosi svaki."
+            ? "Dodajte komade i bodove. Negativni bodovi su za reklamaciju."
             : "Šifarnik komada koje kolektiv izbacuje."
         }
       />
@@ -131,13 +156,12 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Naziv (npr. Krevet)"
+          placeholder="Naziv (npr. Krevet ili Reklamacija)"
           className="rounded-xl border border-line bg-white px-3 py-3"
           required
         />
         <input
           type="number"
-          min={0}
           step={0.5}
           value={points}
           onChange={(e) => setPoints(e.target.value)}
@@ -190,7 +214,6 @@ export function FurnitureScreen({ owner }: { owner: boolean }) {
                   Bodovi
                   <input
                     type="number"
-                    min={0}
                     step={0.5}
                     value={draft.points}
                     onChange={(e) =>

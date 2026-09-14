@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatRsd } from "@/lib/format";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PageHeader } from "./PageHeader";
 
 export function SettingsScreen() {
@@ -16,14 +17,26 @@ export function SettingsScreen() {
   const [resetError, setResetError] = useState("");
   const [resetPending, setResetPending] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/settings")
-      .then(async (response) => {
-        const data = await response.json();
-        if (response.ok) setRsdPerPoint(String(data.rsdPerPoint));
-      })
-      .catch(() => setError("Podešavanja nisu učitana."));
+  const loadedRsd = useRef("");
+  const rsdDirty = useRef(false);
+
+  const load = useCallback(async (silent = false) => {
+    const response = await fetch("/api/settings", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) {
+      if (!silent) setError("Podešavanja nisu učitana.");
+      return;
+    }
+    const next = String(data.rsdPerPoint);
+    loadedRsd.current = next;
+    if (!rsdDirty.current) setRsdPerPoint(next);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useAutoRefresh(() => load(true));
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -48,6 +61,8 @@ export function SettingsScreen() {
     setOwnerPassword("");
     setOperatorPassword("");
     setMessage("Sačuvano.");
+    rsdDirty.current = false;
+    loadedRsd.current = String(Number(rsdPerPoint));
   }
 
   async function resetData() {
@@ -87,7 +102,10 @@ export function SettingsScreen() {
             min={0}
             step={1}
             value={rsdPerPoint}
-            onChange={(e) => setRsdPerPoint(e.target.value)}
+            onChange={(e) => {
+              rsdDirty.current = e.target.value !== loadedRsd.current;
+              setRsdPerPoint(e.target.value);
+            }}
             className="mt-2 w-full rounded-xl border border-line bg-white px-3 py-3 text-base font-normal"
             required
           />

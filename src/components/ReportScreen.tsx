@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   isoDate,
@@ -20,6 +20,7 @@ import {
   formatRsd,
 } from "@/lib/format";
 import { PageHeader } from "./PageHeader";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type AssemblyDetail = { name: string; quantity: number; points?: number };
 
@@ -130,7 +131,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
     setMonth(next.month);
   }
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     const params = new URLSearchParams({
       year: String(year),
       month: String(month),
@@ -140,16 +141,18 @@ export function ReportScreen({ owner }: { owner: boolean }) {
       params.set("from", fromDate);
       params.set("to", toDate);
     }
-    fetch(`/api/reports?${params}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Greška");
-        setReport(data);
-        setShowFurniture(false);
-        setError("");
-      })
-      .catch((err: Error) => setError(err.message));
+    const response = await fetch(`/api/reports?${params}`, { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Greška");
+    setReport(data);
+    setError("");
   }, [year, month, period, fromDate, toDate]);
+
+  useEffect(() => {
+    load().catch((err: Error) => setError(err.message));
+  }, [load]);
+
+  useAutoRefresh(() => load().catch((err: Error) => setError(err.message)));
 
   const sums = report?.rows.reduce(
     (acc, row) => ({
@@ -247,7 +250,7 @@ export function ReportScreen({ owner }: { owner: boolean }) {
       {report ? (
         <>
           <div className="rounded-3xl border border-brand/40 bg-card p-4 text-sm shadow-sm shadow-brand/10">
-            <p className="font-semibold">Kolektiv</p>
+            <p className="font-semibold">Kolektiv „ubaceno u kombi“</p>
             {owner ? (
               <>
                 <p className="mt-1 text-muted">

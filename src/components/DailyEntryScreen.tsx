@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import {
   formatDisplayDate,
   isLastDayOfMonth,
@@ -32,14 +33,26 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   const [error, setError] = useState("");
   const [addPick, setAddPick] = useState({ typeId: "", qty: "1" });
 
-  const load = useCallback(async (selected: string) => {
-    setLoading(true);
-    setError("");
-    const response = await fetch(`/api/entries?date=${selected}`);
+  const collectiveSavedRef = useRef(true);
+  const requestId = useRef(0);
+  collectiveSavedRef.current = collectiveSaved;
+
+  const load = useCallback(async (selected: string, silent = false) => {
+    const id = silent ? requestId.current : ++requestId.current;
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
+    const response = await fetch(`/api/entries?date=${selected}`, {
+      cache: "no-store",
+    });
     const data = await response.json().catch(() => ({}));
+    if (id !== requestId.current) return;
     if (!response.ok) {
-      setError(data.error || "Učitavanje nije uspelo.");
-      setLoading(false);
+      if (!silent) {
+        setError(data.error || "Učitavanje nije uspelo.");
+        setLoading(false);
+      }
       return;
     }
     setWorkers(data.workers);
@@ -47,37 +60,60 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
     setRsdPerPoint(data.rsdPerPoint ?? 0);
     setMonthFurnitureQuantity(data.monthFurnitureQuantity ?? 0);
     setMonthHoursOther(data.monthHoursOther ?? {});
-    const next: Record<string, WorkerDraft> = {};
-    for (const worker of data.workers as Worker[]) {
-      const entry = (
-        data.entries as { workerId: string; hoursWorked: number }[]
-      ).find((item) => item.workerId === worker.id);
-      next[worker.id] = {
-        hoursWorked: entry ? String(entry.hoursWorked) : "",
-        saved: true,
-        saving: false,
-      };
-    }
-    setDrafts(next);
-    setCollective(
-      (data.collective?.assemblies ?? []).map(
-        (line: { furnitureTypeId: string; quantity: number }) => ({
-          furnitureTypeId: line.furnitureTypeId,
-          quantity: line.quantity,
-        }),
-      ),
-    );
-    setCollectiveSaved(true);
-    setAddPick({
-      typeId: data.furniture[0]?.id ?? "",
-      qty: "1",
+    const entries = (data.entries ?? []) as {
+      workerId: string;
+      hoursWorked: number;
+    }[];
+    setDrafts((current) => {
+      const next: Record<string, WorkerDraft> = {};
+      for (const worker of data.workers as Worker[]) {
+        const existing = current[worker.id];
+        const entry = entries.find((item) => item.workerId === worker.id);
+        if (existing && (!existing.saved || existing.saving)) {
+          next[worker.id] = existing;
+        } else {
+          next[worker.id] = {
+            hoursWorked: entry ? String(entry.hoursWorked) : "",
+            saved: true,
+            saving: false,
+          };
+        }
+      }
+      return next;
     });
+    if (!silent || collectiveSavedRef.current) {
+      setCollective(
+        (data.collective?.assemblies ?? []).map(
+          (line: { furnitureTypeId: string; quantity: number }) => ({
+            furnitureTypeId: line.furnitureTypeId,
+            quantity: line.quantity,
+          }),
+        ),
+      );
+      setCollectiveSaved(true);
+    }
+    if (silent) {
+      setAddPick((current) => {
+        const stillThere = (data.furniture as Furniture[]).some(
+          (item) => item.id === current.typeId,
+        );
+        if (stillThere) return current;
+        return { typeId: data.furniture[0]?.id ?? "", qty: current.qty || "1" };
+      });
+    } else {
+      setAddPick({
+        typeId: data.furniture[0]?.id ?? "",
+        qty: "1",
+      });
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    load(date);
+    void load(date);
   }, [date, load]);
+
+  useAutoRefresh(() => load(date, true));
 
   async function saveWorker(workerId: string, draft = drafts[workerId]) {
     if (!draft) return;
@@ -121,7 +157,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
       return;
     }
     setCollectiveSaved(true);
-    await load(date);
+    await load(date, true);
   }
 
   function furnitureName(id: string) {
@@ -233,7 +269,9 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         <section className="rounded-3xl border border-brand/40 bg-card p-4 shadow-sm shadow-brand/10">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Kolektiv</h2>
+              <h2 className="text-lg font-semibold">
+                Kolektiv „ubaceno u kombi“
+              </h2>
               <p className="text-xs text-muted">
                 {owner
                   ? "Bodovi iz proizvoda važe za sve radnike zajedno."

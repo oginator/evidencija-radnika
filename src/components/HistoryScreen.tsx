@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isoDate, lastDayOfMonthNum, MONTH_NAMES } from "@/lib/period";
 import {
   formatHours,
@@ -9,6 +9,7 @@ import {
   formatPoints,
   formatRsd,
 } from "@/lib/format";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { PageHeader } from "./PageHeader";
 
 type MonthRow = {
@@ -27,16 +28,23 @@ export function HistoryScreen() {
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/reports/history")
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Greška");
-        setMonths(data.months);
-      })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoaded(true));
+  const load = useCallback(async () => {
+    const response = await fetch("/api/reports/history", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Greška");
+    setMonths(data.months);
+    setError("");
+    setLoaded(true);
   }, []);
+
+  useEffect(() => {
+    load().catch((err: Error) => {
+      setError(err.message);
+      setLoaded(true);
+    });
+  }, [load]);
+
+  useAutoRefresh(() => load().catch(() => {}));
 
   const maxPoints = Math.max(1, ...months.map((m) => m.totalPoints));
 

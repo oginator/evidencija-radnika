@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
   if (body?.pointsPerPiece !== undefined) {
     const points = Number(body.pointsPerPiece);
-    if (!Number.isFinite(points) || points < 0) {
+    if (!Number.isFinite(points)) {
       return NextResponse.json({ error: "Unesite ispravne bodove." }, { status: 400 });
     }
     data.pointsPerPiece = points;

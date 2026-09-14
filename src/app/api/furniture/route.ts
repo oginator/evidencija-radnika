@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (!name) {
     return NextResponse.json({ error: "Unesite naziv nameštaja." }, { status: 400 });
   }
-  if (!Number.isFinite(pointsPerPiece) || pointsPerPiece < 0) {
+  if (!Number.isFinite(pointsPerPiece)) {
     return NextResponse.json({ error: "Unesite ispravne bodove." }, { status: 400 });
   }
 
