@@ -96,6 +96,7 @@ export async function GET(request: Request) {
       workerId: entry.workerId,
       hoursWorked: entry.hoursWorked,
       hoursConfirmed: entry.hoursConfirmed,
+      didNotWork: entry.didNotWork,
     })),
   });
 }
@@ -111,6 +112,7 @@ export async function PUT(request: Request) {
     workerId?: string;
     hoursWorked?: number;
     hoursConfirmed?: boolean;
+    didNotWork?: boolean;
   } | null;
 
   const date = body?.date ?? "";
@@ -118,6 +120,7 @@ export async function PUT(request: Request) {
   const hasHours = body?.hoursWorked !== undefined && body?.hoursWorked !== null;
   const hoursWorked = hasHours ? Number(body?.hoursWorked) : undefined;
   const hoursConfirmed = body?.hoursConfirmed;
+  const didNotWork = body?.didNotWork;
   const owner = session.role === "owner";
 
   if (!validDate(date)) {
@@ -136,7 +139,7 @@ export async function PUT(request: Request) {
     where: { workerId_date: { workerId, date } },
   });
 
-  if (hoursConfirmed === false) {
+  if (hoursConfirmed === false || didNotWork === false) {
     if (!owner) {
       return NextResponse.json(
         { error: "Samo vlasnik može da otključa sate." },
@@ -146,10 +149,14 @@ export async function PUT(request: Request) {
     if (existing) {
       await prisma.dailyEntry.update({
         where: { id: existing.id },
-        data: { hoursConfirmed: false },
+        data: { hoursConfirmed: false, didNotWork: false },
       });
     }
-    return NextResponse.json({ ok: true, hoursConfirmed: false });
+    return NextResponse.json({
+      ok: true,
+      hoursConfirmed: false,
+      didNotWork: false,
+    });
   }
 
   if (owner) {
@@ -159,9 +166,49 @@ export async function PUT(request: Request) {
     );
   }
 
-  if (existing?.hoursConfirmed) {
+  const locked = !!(existing?.hoursConfirmed || existing?.didNotWork);
+
+  if (didNotWork === true) {
+    if (locked) {
+      return NextResponse.json(
+        { error: "Unos je zaključan. Vlasnik mora da ga otključa." },
+        { status: 403 },
+      );
+    }
+    try {
+      await prisma.dailyEntry.upsert({
+        where: { workerId_date: { workerId, date } },
+        create: {
+          workerId,
+          date,
+          hoursWorked: 0,
+          hoursConfirmed: false,
+          didNotWork: true,
+        },
+        update: {
+          hoursWorked: 0,
+          hoursConfirmed: false,
+          didNotWork: true,
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      return NextResponse.json(
+        { error: "Označavanje nije uspelo." },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      hoursWorked: 0,
+      hoursConfirmed: false,
+      didNotWork: true,
+    });
+  }
+
+  if (locked) {
     return NextResponse.json(
-      { error: "Sati su potvrđeni. Vlasnik mora da ih otključa." },
+      { error: "Sati su zaključani. Vlasnik mora da ih otključa." },
       { status: 403 },
     );
   }
@@ -205,9 +252,11 @@ export async function PUT(request: Request) {
         date,
         hoursWorked: nextHours,
         hoursConfirmed: hoursConfirmed === true,
+        didNotWork: false,
       },
       update: {
         hoursWorked: nextHours,
+        didNotWork: false,
         ...(hoursConfirmed === true ? { hoursConfirmed: true } : {}),
       },
     });
@@ -216,5 +265,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Čuvanje sati nije uspelo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, hoursConfirmed: hoursConfirmed === true });
+  return NextResponse.json({
+    ok: true,
+    hoursConfirmed: hoursConfirmed === true,
+    didNotWork: false,
+  });
 }

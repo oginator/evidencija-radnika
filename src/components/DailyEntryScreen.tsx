@@ -21,7 +21,9 @@ type WorkerDraft = {
   saved: boolean;
   saving: boolean;
   hoursConfirmed: boolean;
+  didNotWork: boolean;
   confirming: boolean;
+  markingAbsent: boolean;
 };
 
 function ConfirmedMark() {
@@ -41,6 +43,28 @@ function ConfirmedMark() {
       </svg>
     </span>
   );
+}
+
+function AbsentMark() {
+  return (
+    <span
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-600 text-white"
+      aria-label="Nije radio"
+    >
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden>
+        <path
+          d="M6 6 14 14 M14 6 6 14"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function isLocked(draft: WorkerDraft) {
+  return draft.hoursConfirmed || draft.didNotWork;
 }
 
 export function DailyEntryScreen({ owner }: { owner: boolean }) {
@@ -89,6 +113,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
       workerId: string;
       hoursWorked: number;
       hoursConfirmed?: boolean;
+      didNotWork?: boolean;
     }[];
     setDrafts((current) => {
       const next: Record<string, WorkerDraft> = {};
@@ -96,25 +121,35 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         const existing = current[worker.id];
         const entry = entries.find((item) => item.workerId === worker.id);
         const confirmed = !!entry?.hoursConfirmed;
-        if (existing?.confirming) {
+        const didNotWork = !!entry?.didNotWork;
+        const locked = confirmed || didNotWork;
+        if (existing?.confirming || existing?.markingAbsent) {
           next[worker.id] = existing;
-        } else if (confirmed) {
+        } else if (locked) {
           next[worker.id] = {
-            hoursWorked: entry ? String(entry.hoursWorked) : "",
+            hoursWorked: didNotWork ? "0" : entry ? String(entry.hoursWorked) : "",
             saved: true,
             saving: false,
-            hoursConfirmed: true,
+            hoursConfirmed: confirmed,
+            didNotWork,
             confirming: false,
+            markingAbsent: false,
           };
         } else if (existing && (!existing.saved || existing.saving)) {
-          next[worker.id] = { ...existing, hoursConfirmed: false };
+          next[worker.id] = {
+            ...existing,
+            hoursConfirmed: false,
+            didNotWork: false,
+          };
         } else {
           next[worker.id] = {
             hoursWorked: entry ? String(entry.hoursWorked) : "",
             saved: true,
             saving: false,
             hoursConfirmed: false,
+            didNotWork: false,
             confirming: false,
+            markingAbsent: false,
           };
         }
       }
@@ -155,7 +190,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
   useAutoRefresh(() => load(date, true));
 
   async function saveWorker(workerId: string, draft = drafts[workerId]) {
-    if (!draft || owner || draft.hoursConfirmed) return;
+    if (!draft || owner || isLocked(draft)) return;
     setDrafts((current) => ({
       ...current,
       [workerId]: { ...current[workerId], saving: true },
@@ -182,13 +217,14 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         saved: true,
         saving: false,
         hoursConfirmed: data.hoursConfirmed === true,
+        didNotWork: data.didNotWork === true,
       },
     }));
   }
 
   async function confirmWorker(workerId: string) {
     const draft = drafts[workerId];
-    if (!draft || owner || draft.hoursConfirmed) return;
+    if (!draft || owner || isLocked(draft)) return;
     const hoursWorked = draft.hoursWorked === "" ? 0 : Number(draft.hoursWorked);
     if (!Number.isFinite(hoursWorked) || hoursWorked <= 0) {
       setError("Unesite sate pa potvrdite.");
@@ -221,7 +257,46 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         saved: true,
         saving: false,
         hoursConfirmed: true,
+        didNotWork: false,
         confirming: false,
+        markingAbsent: false,
+      },
+    }));
+  }
+
+  async function markAbsent(workerId: string) {
+    const draft = drafts[workerId];
+    if (!draft || owner || isLocked(draft)) return;
+    setError("");
+    setDrafts((current) => ({
+      ...current,
+      [workerId]: { ...current[workerId], markingAbsent: true },
+    }));
+    const response = await fetch("/api/entries", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, workerId, didNotWork: true }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(data.error || "Označavanje nije uspelo.");
+      setDrafts((current) => ({
+        ...current,
+        [workerId]: { ...current[workerId], markingAbsent: false },
+      }));
+      return;
+    }
+    setDrafts((current) => ({
+      ...current,
+      [workerId]: {
+        ...current[workerId],
+        hoursWorked: "0",
+        saved: true,
+        saving: false,
+        hoursConfirmed: false,
+        didNotWork: true,
+        confirming: false,
+        markingAbsent: false,
       },
     }));
   }
@@ -232,7 +307,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
     const response = await fetch("/api/entries", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, workerId, hoursConfirmed: false }),
+      body: JSON.stringify({ date, workerId, hoursConfirmed: false, didNotWork: false }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -241,7 +316,11 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
     }
     setDrafts((current) => ({
       ...current,
-      [workerId]: { ...current[workerId], hoursConfirmed: false },
+      [workerId]: {
+        ...current[workerId],
+        hoursConfirmed: false,
+        didNotWork: false,
+      },
     }));
   }
 
@@ -516,24 +595,44 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
         const draft = drafts[worker.id];
         if (!draft) return null;
         const confirmed = draft.hoursConfirmed;
-        const hoursReadOnly = owner || confirmed;
+        const absent = draft.didNotWork;
+        const locked = confirmed || absent;
+        const hoursReadOnly = owner || locked;
+        const busy = draft.saving || draft.confirming || draft.markingAbsent;
         return (
           <section
             key={worker.id}
             className={`rounded-3xl border p-4 shadow-sm shadow-slate-900/5 ${
-              draft.hoursConfirmed
-                ? "border-emerald-500 bg-emerald-50"
-                : monthEnd
-                  ? "border-red-400 bg-red-50"
-                  : "border-line bg-card"
+              absent
+                ? "border-red-500 bg-red-50"
+                : confirmed
+                  ? "border-emerald-500 bg-emerald-50"
+                  : monthEnd
+                    ? "border-red-400 bg-red-50"
+                    : "border-line bg-card"
             }`}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold">{worker.name}</h2>
-                {draft.hoursConfirmed ? <ConfirmedMark /> : null}
+                {absent ? (
+                  <AbsentMark />
+                ) : confirmed ? (
+                  <ConfirmedMark />
+                ) : owner ? null : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => markAbsent(worker.id)}
+                    className="rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold leading-none text-white disabled:opacity-60"
+                  >
+                    {draft.markingAbsent ? "..." : "Nije radio"}
+                  </button>
+                )}
               </div>
-              {draft.hoursConfirmed ? (
+              {absent ? (
+                <span className="text-xs font-semibold text-red-700">Nije radio</span>
+              ) : confirmed ? (
                 <span className="text-xs font-semibold text-emerald-700">Potvrđeno</span>
               ) : draft.saved ? (
                 <span className={`text-xs ${monthEnd ? "text-red-700" : "text-brand"}`}>
@@ -545,11 +644,13 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
             </div>
             <p
               className={`mt-2 rounded-xl px-3 py-2 text-sm font-semibold ${
-                draft.hoursConfirmed
-                  ? "bg-emerald-100 text-emerald-800"
-                  : monthEnd
-                    ? "bg-red-100 text-red-800"
-                    : "bg-background text-brand"
+                absent
+                  ? "bg-red-100 text-red-800"
+                  : confirmed
+                    ? "bg-emerald-100 text-emerald-800"
+                    : monthEnd
+                      ? "bg-red-100 text-red-800"
+                      : "bg-background text-brand"
               }`}
             >
               {monthEnd ? "Ukupno sati ovog meseca: " : "Ovaj mesec: "}
@@ -576,30 +677,36 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                   }))
                 }
                 className={`mt-1 w-full rounded-xl border px-3 py-3 text-lg ${
-                  confirmed
-                    ? "cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-900"
-                    : hoursReadOnly
-                      ? "cursor-not-allowed border-line bg-slate-50"
-                      : "border-line bg-white"
+                  absent
+                    ? "cursor-not-allowed border-red-200 bg-red-50 text-red-900"
+                    : confirmed
+                      ? "cursor-not-allowed border-emerald-200 bg-emerald-50 text-emerald-900"
+                      : hoursReadOnly
+                        ? "cursor-not-allowed border-line bg-slate-50"
+                        : "border-line bg-white"
                 }`}
                 placeholder="npr. 8"
               />
             </label>
             {owner ? (
-              confirmed ? (
+              locked ? (
                 <button
                   type="button"
                   onClick={() => unlockWorker(worker.id)}
-                  className="mt-4 w-full rounded-xl border border-emerald-300 bg-white py-2.5 text-sm font-medium text-emerald-800"
+                  className={`mt-4 w-full rounded-xl border bg-white py-2.5 text-sm font-medium ${
+                    absent
+                      ? "border-red-300 text-red-800"
+                      : "border-emerald-300 text-emerald-800"
+                  }`}
                 >
                   Otključaj
                 </button>
               ) : null
-            ) : confirmed ? null : (
+            ) : locked ? null : (
               <div className="mt-4 flex flex-col gap-2">
                 <button
                   type="button"
-                  disabled={draft.saving || draft.confirming}
+                  disabled={busy}
                   onClick={() => saveWorker(worker.id)}
                   className="w-full rounded-xl bg-brand py-2.5 font-medium text-white disabled:opacity-60"
                 >
@@ -607,7 +714,7 @@ export function DailyEntryScreen({ owner }: { owner: boolean }) {
                 </button>
                 <button
                   type="button"
-                  disabled={draft.confirming || draft.saving}
+                  disabled={busy}
                   onClick={() => confirmWorker(worker.id)}
                   className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white disabled:opacity-60"
                 >
